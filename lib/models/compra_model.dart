@@ -19,48 +19,46 @@ class CompraModel {
 
   bool get ehAssinatura => totalParcelas == 999;
 
-  DateTime _obterDataFaturamentoInicial(DateTime data, int diaVencimento) {
-    if (diaVencimento <= 10) {
-      int diaFechamentoMesAnterior = diaVencimento - 10 + 30;
-      if (data.day >= diaFechamentoMesAnterior) {
-        int proximoMes = data.month + 2;
-        int proximoAno = data.year;
-        if (proximoMes > 12) {
-          proximoMes -= 12;
-          proximoAno += 1;
-        }
-        return DateTime(proximoAno, proximoMes, 1);
-      } else {
-        int proximoMes = data.month + 1;
-        int proximoAno = data.year;
-        if (proximoMes > 12) {
-          proximoMes -= 12;
-          proximoAno += 1;
-        }
-        return DateTime(proximoAno, proximoMes, 1);
+  DateTime _obterDataFaturamentoInicial(
+    DateTime data,
+    int diaFechamentoOuVencimento,
+  ) {
+    int anoAtual = data.year;
+    int mesAtual = data.month;
+    int diaFechamentoReal = diaFechamentoOuVencimento;
+
+    if (diaFechamentoOuVencimento > 10) {
+      diaFechamentoReal = diaFechamentoOuVencimento - 10;
+    }
+
+    DateTime limiteFaturaMesAtual = DateTime(
+      anoAtual,
+      mesAtual,
+      diaFechamentoReal,
+    );
+
+    if (data.isAfter(limiteFaturaMesAtual) ||
+        data.isAtSameMomentAs(limiteFaturaMesAtual)) {
+      int proximoMes = mesAtual + 1;
+      int anoDoProximoMes = anoAtual;
+      if (proximoMes > 12) {
+        proximoMes = 1;
+        anoDoProximoMes += 1;
       }
+      return DateTime(anoDoProximoMes, proximoMes, 1);
     } else {
-      int diaFechamentoMesAtual = diaVencimento - 10;
-      if (data.day >= diaFechamentoMesAtual) {
-        int proximoMes = data.month + 1;
-        int proximoAno = data.year;
-        if (proximoMes > 12) {
-          proximoMes -= 12;
-          proximoAno += 1;
-        }
-        return DateTime(proximoAno, proximoMes, 1);
-      } else {
-        return DateTime(data.year, data.month, 1);
-      }
+      return DateTime(anoAtual, mesAtual, 1);
     }
   }
 
-  int calcularParcelaNoMes(DateTime mesAlvo, int diaVencimento) {
-    if (ehAssinatura) return 1;
+  int calcularParcelaNoMes(DateTime mesAlvo, int diaFechamentoOuVencimento) {
+    if (ehAssinatura) {
+      return 1;
+    }
 
     DateTime dataInicioFaturamento = _obterDataFaturamentoInicial(
       dataCompra,
-      diaVencimento,
+      diaFechamentoOuVencimento,
     );
     DateTime dataAlvoFiltro = DateTime(mesAlvo.year, mesAlvo.month, 1);
 
@@ -71,11 +69,11 @@ class CompraModel {
     return diferencaMeses + 1;
   }
 
-  bool estaAtivaNoMes(DateTime mesAlvo, int diaVencimento) {
+  bool estaAtivaNoMes(DateTime mesAlvo, int diaFechamentoOuVencimento) {
     if (ehAssinatura) {
       DateTime dataInicioFaturamento = _obterDataFaturamentoInicial(
         dataCompra,
-        diaVencimento,
+        diaFechamentoOuVencimento,
       );
       final DateTime dataFiltroAlvo = DateTime(mesAlvo.year, mesAlvo.month, 1);
 
@@ -84,7 +82,7 @@ class CompraModel {
               dataFiltroAlvo.month == dataInicioFaturamento.month);
     }
 
-    final parcela = calcularParcelaNoMes(mesAlvo, diaVencimento);
+    final parcela = calcularParcelaNoMes(mesAlvo, diaFechamentoOuVencimento);
     return parcela >= 1 && parcela <= totalParcelas;
   }
 

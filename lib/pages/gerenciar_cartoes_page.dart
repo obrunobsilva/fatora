@@ -35,7 +35,9 @@ class _GerenciarCartoesPageState extends State<GerenciarCartoesPage> {
   Future<void> _carregarDados() async {
     final dadosCartoes = await StorageService.obterConfiguracaoCartoes();
     final dadosCompras = await StorageService.carregarCompras();
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _cartoes = List<Map<String, dynamic>>.from(dadosCartoes);
       _compras = dadosCompras;
@@ -118,13 +120,13 @@ class _GerenciarCartoesPageState extends State<GerenciarCartoesPage> {
     return resultado ?? false;
   }
 
-  Future<bool> _exibirAvisoComprasPendentes(String nomeCartao) async {
+  Future<bool> _exibirAvisoExclusao(String nomeCartao) async {
     final resultado = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Atenção'),
+        title: const Text('Excluir Cartão?'),
         content: Text(
-          'O cartão "$nomeCartao" possui compras parceladas ativas. Se você excluir, essas contas sumirão do resumo.\n\nDeseja mesmo excluir?',
+          'Atenção: O cartão "$nomeCartao" possui compras vinculadas. Se você excluir, TODAS as despesas desse cartão também serão apagadas do histórico de forma definitiva.\n\nDeseja mesmo confirmar a exclusão?',
         ),
         actions: [
           TextButton(
@@ -133,7 +135,8 @@ class _GerenciarCartoesPageState extends State<GerenciarCartoesPage> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('EXCLUIR'),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('CONFIRMAR'),
           ),
         ],
       ),
@@ -194,151 +197,156 @@ class _GerenciarCartoesPageState extends State<GerenciarCartoesPage> {
           },
           onCartoesAtualizados: _carregarDados,
         ),
-        body: SafeArea(
-          bottom: true,
-          child: _cartoes.isEmpty
-              ? Center(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 24),
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: profundidadeSutil,
-                      border: Border.all(
-                        color: isDark ? Colors.white10 : Colors.black12,
-                        width: 1,
-                      ),
-                    ),
-                    child: const Text(
-                      'Nenhum cartão cadastrado.',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
+        body: _cartoes.isEmpty
+            ? Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: profundidadeSutil,
+                    border: Border.all(
+                      color: isDark ? Colors.white10 : Colors.black12,
+                      width: 1,
                     ),
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 16,
+                  child: const Text(
+                    'Nenhum cartão cadastrado.',
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
                   ),
-                  itemCount: _cartoes.length,
-                  itemBuilder: (context, index) {
-                    final item = _cartoes[index];
-                    return Dismissible(
-                      key: Key(item['nome'] + index.toString()),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.error.withValues(
-                            alpha: 0.15,
-                          ),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        alignment: Alignment.centerRight,
-                        child: Icon(
-                          Icons.delete_outline_rounded,
-                          color: theme.colorScheme.error,
-                          size: 24,
-                        ),
-                      ),
-                      confirmDismiss: (direction) async {
-                        if (_cartoes.length <= 1) {
-                          await _exibirAvisoUltimoCartao();
-                          return false;
-                        }
-                        final String nomeDoCartao = item['nome']
-                            .toString()
-                            .trim()
-                            .toLowerCase();
-                        final int diaFechamento = item['fechamento'] as int;
-                        final temComprasAtivas = _compras.any(
-                          (c) =>
-                              c.cartao.trim().toLowerCase() == nomeDoCartao &&
-                              c.estaAtivaNoMes(DateTime.now(), diaFechamento),
-                        );
-                        if (temComprasAtivas) {
-                          return await _exibirAvisoComprasPendentes(
-                            item['nome'],
-                          );
-                        }
-                        return true;
-                      },
-                      onDismissed: (direction) {
-                        setState(() {
-                          _cartoes.removeAt(index);
-                        });
-                        _salvarEAtualizar();
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 6),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: profundidadeSutil,
-                          border: Border.all(
-                            color: isDark ? Colors.white10 : Colors.black12,
-                            width: 1,
-                          ),
-                        ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 6,
-                          ),
-                          leading: Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? Colors.white10
-                                  : const Color(0xFFF5F5F7),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.credit_card_rounded,
-                              color: theme.colorScheme.primary,
-                              size: 20,
-                            ),
-                          ),
-                          title: Text(
-                            item['nome'],
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          subtitle: Padding(
-                            padding: const EdgeInsets.only(top: 4.0),
-                            child: Text(
-                              'Fecha todo dia ${item['fechamento']}',
-                              style: TextStyle(
-                                color: theme.colorScheme.secondary.withValues(
-                                  alpha: 0.7,
-                                ),
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
                 ),
-        ),
-        floatingActionButton: Padding(
-          padding: const EdgeInsets.only(bottom: 12.0),
-          child: FloatingActionButton(
-            onPressed: _exibirDialogoAdicionar,
-            backgroundColor: theme.colorScheme.primary,
-            foregroundColor: isDark ? const Color(0xFF1D1D1F) : Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.add_rounded),
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                itemCount: _cartoes.length,
+                itemBuilder: (context, index) {
+                  final item = _cartoes[index];
+                  return Dismissible(
+                    key: Key(item['nome'] + index.toString()),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.error.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      alignment: Alignment.centerRight,
+                      child: Icon(
+                        Icons.delete_outline_rounded,
+                        color: theme.colorScheme.error,
+                        size: 24,
+                      ),
+                    ),
+                    confirmDismiss: (direction) async {
+                      if (_cartoes.length <= 1) {
+                        await _exibirAvisoUltimoCartao();
+                        return false;
+                      }
+
+                      final dadosComprasAtualizados =
+                          await StorageService.carregarCompras();
+                      final String nomeDoCartao = item['nome']
+                          .toString()
+                          .trim()
+                          .toLowerCase();
+
+                      final bool temComprasDeFato = dadosComprasAtualizados.any(
+                        (c) => c.cartao.trim().toLowerCase() == nomeDoCartao,
+                      );
+
+                      if (temComprasDeFato) {
+                        return await _exibirAvisoExclusao(item['nome']);
+                      }
+
+                      return true;
+                    },
+                    onDismissed: (direction) async {
+                      final String nomeDoCartaoRemovido = item['nome']
+                          .toString()
+                          .trim()
+                          .toLowerCase();
+
+                      setState(() {
+                        _cartoes.removeAt(index);
+                        _compras.removeWhere(
+                          (c) =>
+                              c.cartao.trim().toLowerCase() ==
+                              nomeDoCartaoRemovido,
+                        );
+                      });
+
+                      await _salvarEAtualizar();
+                      await StorageService.salvarCompras(_compras);
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: profundidadeSutil,
+                        border: Border.all(
+                          color: isDark ? Colors.white10 : Colors.black12,
+                          width: 1,
+                        ),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white10
+                                : const Color(0xFFF5F5F7),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.credit_card_rounded,
+                            color: theme.colorScheme.primary,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          item['nome'],
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            'Fecha todo dia ${item['fechamento']}',
+                            style: TextStyle(
+                              color: theme.colorScheme.secondary.withValues(
+                                alpha: 0.7,
+                              ),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: _exibirDialogoAdicionar,
+          backgroundColor: theme.colorScheme.primary,
+          foregroundColor: isDark ? const Color(0xFF1D1D1F) : Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
           ),
+          child: const Icon(Icons.add_rounded),
         ),
       ),
     );

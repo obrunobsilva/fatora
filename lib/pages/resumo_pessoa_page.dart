@@ -44,7 +44,9 @@ class _ResumoPessoaPageState extends State<ResumoPessoaPage> {
       final fechamento = c['fechamento'] as int;
       mapaFechamentos[nome.trim().toLowerCase()] = fechamento;
     }
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _fechamentoCartoes = mapaFechamentos;
       _carregando = false;
@@ -108,7 +110,9 @@ class _ResumoPessoaPageState extends State<ResumoPessoaPage> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
+        if (didPop) {
+          return;
+        }
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const HomePage()),
@@ -245,10 +249,7 @@ class _ResumoPessoaPageState extends State<ResumoPessoaPage> {
                       ),
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 4,
-                      ),
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
                       itemCount: listaPessoasOrdenada.length,
                       itemBuilder: (context, index) {
                         final nomeParente = listaPessoasOrdenada[index];
