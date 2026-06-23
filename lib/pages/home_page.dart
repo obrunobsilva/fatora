@@ -5,6 +5,7 @@ import '../components/seletor_parcelas.dart';
 import '../components/seletor_parcela_atual.dart';
 import '../components/menu_lateral.dart';
 import '../services/storage_service.dart';
+import 'package:fatora/main.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -35,32 +36,75 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _carregarDadosIniciais() async {
-    final dadosCarregados = await StorageService.carregarCompras();
-    final configCartoes =
-        await StorageService.obterConfiguracaoCartoes(); // Corrigido para português
-    final List<String> nomesExtraidos = configCartoes
-        .map((c) => c['nome'] as String)
-        .toList();
-    if (!mounted) return;
-    setState(() {
-      _compras = dadosCarregados;
-      _nomesCartoes = nomesExtraidos;
-      if (_nomesCartoes.isNotEmpty && _cartaoSelecionado.isEmpty) {
-        _cartaoSelecionado = _nomesCartoes.first;
+    try {
+      final dadosCarregados = await StorageService.carregarCompras();
+      final configCartoes = await StorageService.obterConfiguracaoCartoes();
+      final List<String> nomesExtraidos = configCartoes
+          .map((c) => c['nome'] as String)
+          .toList();
+
+      if (!mounted) {
+        return;
       }
-    });
+
+      setState(() {
+        _compras = dadosCarregados;
+        _nomesCartoes = nomesExtraidos;
+        if (_nomesCartoes.isNotEmpty && _cartaoSelecionado.isEmpty) {
+          _cartaoSelecionado = _nomesCartoes.first;
+        }
+      });
+    } catch (e) {
+      debugPrint("Erro: $e");
+    }
   }
 
   Future<void> _salvarCompra() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     final valorLimpo = _valorController.text.replaceAll(',', '.');
     final double? valorDigitado = double.tryParse(valorLimpo);
-    if (valorDigitado == null || valorDigitado <= 0) return;
+    if (valorDigitado == null || valorDigitado <= 0) {
+      return;
+    }
 
     double valorTotalCalculado = valorDigitado;
     int parcelasFinais = _ehAssinaturaRecorrente ? 999 : _parcelasSelecionadas;
     if (_inserirPorValorParcela && !_ehAssinaturaRecorrente) {
       valorTotalCalculado = valorDigitado * _parcelasSelecionadas;
+    }
+
+    DateTime dataBase = DateTime.now();
+
+    try {
+      final configCartoes = await StorageService.obterConfiguracaoCartoes();
+      final cartaoAtual = configCartoes.firstWhere(
+        (c) =>
+            c['nome'].toString().toLowerCase() ==
+            _cartaoSelecionado.toLowerCase(),
+        orElse: () => {'fechamento': 25},
+      );
+
+      int vencimentoCartao = cartaoAtual['fechamento'] as int;
+      int fechamentoReal = vencimentoCartao - 10;
+      if (fechamentoReal < 1) {
+        fechamentoReal = 1;
+      }
+
+      if (dataBase.day >= fechamentoReal) {
+        dataBase = DateTime(dataBase.year, dataBase.month + 1, dataBase.day);
+      }
+    } catch (e) {
+      debugPrint("Erro: $e");
+    }
+
+    if (!_ehAssinaturaRecorrente && _parcelaAtualSelecionada > 1) {
+      dataBase = DateTime(
+        dataBase.year,
+        dataBase.month - (_parcelaAtualSelecionada - 1),
+        dataBase.day,
+      );
     }
 
     final novaCompra = CompraModel(
@@ -70,16 +114,38 @@ class _HomePageState extends State<HomePage> {
       local: _localController.text.trim(),
       cartao: _cartaoSelecionado,
       totalParcelas: parcelasFinais,
-      dataCompra: DateTime.now(),
+      dataCompra: dataBase,
     );
+
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
       _compras.add(novaCompra);
       _parenteController.clear();
       _valorController.clear();
       _localController.clear();
+      _parcelasSelecionadas = 1;
+      _parcelaAtualSelecionada = 1;
     });
     await StorageService.salvarCompras(_compras);
+
+    messengerKey.currentState?.clearSnackBars();
+    messengerKey.currentState?.showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Compra registrada com sucesso!',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   @override
@@ -99,7 +165,9 @@ class _HomePageState extends State<HomePage> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
+        if (didPop) {
+          return;
+        }
         if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
           Navigator.pop(context);
         } else {
@@ -123,8 +191,21 @@ class _HomePageState extends State<HomePage> {
           ),
           drawer: MenuLateral(
             compras: _compras,
-            onRemoverCompra: (id) {},
-            onAdicionarCompra: (c) {},
+            onRemoverCompra: (id) async {
+              _compras.removeWhere((item) => item.id == id);
+              await StorageService.salvarCompras(_compras);
+              if (mounted) {
+                setState(() {});
+              }
+            },
+            onAdicionarCompra: (compra) async {
+              _compras.add(compra);
+              _compras.sort((a, b) => b.dataCompra.compareTo(a.dataCompra));
+              await StorageService.salvarCompras(_compras);
+              if (mounted) {
+                setState(() {});
+              }
+            },
             onCartoesAtualizados: _carregarDadosIniciais,
           ),
           body: _nomesCartoes.isEmpty
@@ -174,17 +255,19 @@ class _HomePageState extends State<HomePage> {
                             ),
                             if (!_ehAssinaturaRecorrente)
                               Switch(
-                                thumbColor: WidgetStateProperty.resolveWith<Color>((
-                                  states,
-                                ) {
-                                  if (states.contains(WidgetState.selected)) {
-                                    return azulTopo; // Bolinha azul quando ligado
-                                  }
-                                  return isDark
-                                      ? Colors.grey.shade400
-                                      : Colors
-                                            .white; // Bolinha branca/cinza destacada quando desligado
-                                }),
+                                thumbColor:
+                                    WidgetStateProperty.resolveWith<Color>((
+                                      states,
+                                    ) {
+                                      if (states.contains(
+                                        WidgetState.selected,
+                                      )) {
+                                        return azulTopo;
+                                      }
+                                      return isDark
+                                          ? Colors.grey.shade400
+                                          : Colors.white;
+                                    }),
                                 trackColor:
                                     WidgetStateProperty.resolveWith<Color>((
                                       states,
@@ -196,9 +279,7 @@ class _HomePageState extends State<HomePage> {
                                       }
                                       return isDark
                                           ? Colors.grey.shade800
-                                          : Colors
-                                                .grey
-                                                .shade300; // Fundo contrastante
+                                          : Colors.grey.shade300;
                                     }),
                                 value: _inserirPorValorParcela,
                                 onChanged: (val) => setState(
@@ -226,7 +307,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                         const SizedBox(height: 20),
                         const Text(
-                          'Onde foi comprado?',
+                          'Onde ou o que foi comprado?',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -237,7 +318,8 @@ class _HomePageState extends State<HomePage> {
                           controller: _localController,
                           textCapitalization: TextCapitalization.words,
                           decoration: InputDecoration(
-                            hintText: 'Ex: Mercado...',
+                            hintText:
+                                'Ex: Mercado, Farmácia, Tênis, Dentista...',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -286,17 +368,19 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                 ),
                                 Switch(
-                                  thumbColor: WidgetStateProperty.resolveWith<Color>((
-                                    states,
-                                  ) {
-                                    if (states.contains(WidgetState.selected)) {
-                                      return azulTopo; // Bolinha azul quando ligado
-                                    }
-                                    return isDark
-                                        ? Colors.grey.shade400
-                                        : Colors
-                                              .white; // Bolinha branca/cinza destacada quando desligado
-                                  }),
+                                  thumbColor:
+                                      WidgetStateProperty.resolveWith<Color>((
+                                        states,
+                                      ) {
+                                        if (states.contains(
+                                          WidgetState.selected,
+                                        )) {
+                                          return azulTopo;
+                                        }
+                                        return isDark
+                                            ? Colors.grey.shade400
+                                            : Colors.white;
+                                      }),
                                   trackColor:
                                       WidgetStateProperty.resolveWith<Color>((
                                         states,
@@ -308,14 +392,14 @@ class _HomePageState extends State<HomePage> {
                                         }
                                         return isDark
                                             ? Colors.grey.shade800
-                                            : Colors
-                                                  .grey
-                                                  .shade300; // Fundo contrastante
+                                            : Colors.grey.shade300;
                                       }),
                                   value: _ehAssinaturaRecorrente,
                                   onChanged: (val) => setState(() {
                                     _ehAssinaturaRecorrente = val;
-                                    if (val) _inserirPorValorParcela = false;
+                                    if (val) {
+                                      _inserirPorValorParcela = false;
+                                    }
                                   }),
                                 ),
                               ],

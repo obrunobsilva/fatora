@@ -67,26 +67,26 @@ class CompraModel {
     return parcela >= 1 && parcela <= totalParcelas;
   }
 
-  int get parcelaAtual {
+  int obterParcelaAtualDinamica(int diaFechamento) {
     if (ehAssinatura) return 1;
-    final dataAtual = DateTime.now();
-    final diferencaMeses =
-        (dataAtual.year - dataCompra.year) * 12 +
-        (dataAtual.month - dataCompra.month);
-    final parcela = diferencaMeses + 1;
-
+    final parcela = calcularParcelaNoMes(DateTime.now(), diaFechamento);
     if (parcela < 1) return 1;
     if (parcela > totalParcelas) return totalParcelas;
     return parcela;
   }
 
-  bool get estaAtiva {
+  bool verificarSeEstaAtivaDinamica(int diaFechamento) {
     if (ehAssinatura) return true;
-    final dataAtual = DateTime.now();
-    final diferencaMeses =
-        (dataAtual.year - dataCompra.year) * 12 +
-        (dataAtual.month - dataCompra.month);
-    return diferencaMeses < totalParcelas;
+    final parcela = calcularParcelaNoMes(DateTime.now(), diaFechamento);
+    return parcela >= 1 && parcela <= totalParcelas;
+  }
+
+  int get parcelaAtual {
+    return obterParcelaAtualDinamica(25);
+  }
+
+  bool get estaAtiva {
+    return verificarSeEstaAtivaDinamica(25);
   }
 
   double get valorParcela =>
