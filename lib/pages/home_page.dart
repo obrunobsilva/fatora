@@ -84,28 +84,6 @@ class _HomePageState extends State<HomePage> {
 
     DateTime dataBase = DateTime.now();
 
-    try {
-      final configCartoes = await StorageService.obterConfiguracaoCartoes();
-      final cartaoAtual = configCartoes.firstWhere(
-        (c) =>
-            c['nome'].toString().toLowerCase() ==
-            _cartaoSelecionado.toLowerCase(),
-        orElse: () => {'fechamento': 25},
-      );
-
-      int vencimentoCartao = cartaoAtual['fechamento'] as int;
-      int fechamentoReal = vencimentoCartao - 10;
-      if (fechamentoReal < 1) {
-        fechamentoReal = 1;
-      }
-
-      if (dataBase.day >= fechamentoReal) {
-        dataBase = DateTime(dataBase.year, dataBase.month + 1, dataBase.day);
-      }
-    } catch (e) {
-      debugPrint("Erro: $e");
-    }
-
     if (!_ehAssinaturaRecorrente && _parcelaAtualSelecionada > 1) {
       dataBase = DateTime(
         dataBase.year,

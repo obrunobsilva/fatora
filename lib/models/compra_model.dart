@@ -19,65 +19,81 @@ class CompraModel {
 
   bool get ehAssinatura => totalParcelas == 999;
 
-  int calcularParcelaNoMes(DateTime mesAlvo, int diaFechamento) {
+  DateTime _obterDataFaturamentoInicial(DateTime data, int diaVencimento) {
+    if (diaVencimento <= 10) {
+      int diaFechamentoMesAnterior = diaVencimento - 10 + 30;
+      if (data.day >= diaFechamentoMesAnterior) {
+        int proximoMes = data.month + 2;
+        int proximoAno = data.year;
+        if (proximoMes > 12) {
+          proximoMes -= 12;
+          proximoAno += 1;
+        }
+        return DateTime(proximoAno, proximoMes, 1);
+      } else {
+        int proximoMes = data.month + 1;
+        int proximoAno = data.year;
+        if (proximoMes > 12) {
+          proximoMes -= 12;
+          proximoAno += 1;
+        }
+        return DateTime(proximoAno, proximoMes, 1);
+      }
+    } else {
+      int diaFechamentoMesAtual = diaVencimento - 10;
+      if (data.day >= diaFechamentoMesAtual) {
+        int proximoMes = data.month + 1;
+        int proximoAno = data.year;
+        if (proximoMes > 12) {
+          proximoMes -= 12;
+          proximoAno += 1;
+        }
+        return DateTime(proximoAno, proximoMes, 1);
+      } else {
+        return DateTime(data.year, data.month, 1);
+      }
+    }
+  }
+
+  int calcularParcelaNoMes(DateTime mesAlvo, int diaVencimento) {
     if (ehAssinatura) return 1;
 
-    DateTime dataInicioFaturamento = DateTime(
-      dataCompra.year,
-      dataCompra.month,
-      diaFechamento,
+    DateTime dataInicioFaturamento = _obterDataFaturamentoInicial(
+      dataCompra,
+      diaVencimento,
     );
-
-    if (dataCompra.day >= diaFechamento) {
-      dataInicioFaturamento = DateTime(
-        dataCompra.year,
-        dataCompra.month + 1,
-        diaFechamento,
-      );
-    }
+    DateTime dataAlvoFiltro = DateTime(mesAlvo.year, mesAlvo.month, 1);
 
     final diferencaMeses =
-        (mesAlvo.year - dataInicioFaturamento.year) * 12 +
-        (mesAlvo.month - dataInicioFaturamento.month);
+        (dataAlvoFiltro.year - dataInicioFaturamento.year) * 12 +
+        (dataAlvoFiltro.month - dataInicioFaturamento.month);
+
     return diferencaMeses + 1;
   }
 
-  bool estaAtivaNoMes(DateTime mesAlvo, int diaFechamento) {
+  bool estaAtivaNoMes(DateTime mesAlvo, int diaVencimento) {
     if (ehAssinatura) {
-      final DateTime dataFiltroAlvo = DateTime(mesAlvo.year, mesAlvo.month);
-      final DateTime dataFiltroCompra = DateTime(
-        dataCompra.year,
-        dataCompra.month,
+      DateTime dataInicioFaturamento = _obterDataFaturamentoInicial(
+        dataCompra,
+        diaVencimento,
       );
-      return dataFiltroAlvo.isAfter(dataFiltroCompra) ||
-          (dataFiltroAlvo.year == dataFiltroCompra.year &&
-              dataFiltroAlvo.month == dataFiltroCompra.month);
+      final DateTime dataFiltroAlvo = DateTime(mesAlvo.year, mesAlvo.month, 1);
+
+      return dataFiltroAlvo.isAfter(dataInicioFaturamento) ||
+          (dataFiltroAlvo.year == dataInicioFaturamento.year &&
+              dataFiltroAlvo.month == dataInicioFaturamento.month);
     }
 
-    final parcela = calcularParcelaNoMes(mesAlvo, diaFechamento);
-    return parcela >= 1 && parcela <= totalParcelas;
-  }
-
-  int obterParcelaAtualDinamica(int diaFechamento) {
-    if (ehAssinatura) return 1;
-    final parcela = calcularParcelaNoMes(DateTime.now(), diaFechamento);
-    if (parcela < 1) return 1;
-    if (parcela > totalParcelas) return totalParcelas;
-    return parcela;
-  }
-
-  bool verificarSeEstaAtivaDinamica(int diaFechamento) {
-    if (ehAssinatura) return true;
-    final parcela = calcularParcelaNoMes(DateTime.now(), diaFechamento);
+    final parcela = calcularParcelaNoMes(mesAlvo, diaVencimento);
     return parcela >= 1 && parcela <= totalParcelas;
   }
 
   int get parcelaAtual {
-    return obterParcelaAtualDinamica(15);
+    return calcularParcelaNoMes(DateTime.now(), 15);
   }
 
   bool get estaAtiva {
-    return verificarSeEstaAtivaDinamica(15);
+    return estaAtivaNoMes(DateTime.now(), 15);
   }
 
   double get valorParcela =>
