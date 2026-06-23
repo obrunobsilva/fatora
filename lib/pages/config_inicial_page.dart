@@ -98,50 +98,52 @@ class _ConfigInicialPageState extends State<ConfigInicialPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Configuração Inicial',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
-      ),
+      appBar: AppBar(title: const Text('Configuração Inicial')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
-                'Bem-vindo ao Fatora!',
+              Text(
+                'Bem-vindo ao Fatora',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Colors.blueAccent,
+                  color: theme.colorScheme.primary,
+                  letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
+              Text(
                 'Configure abaixo os cartões que você costuma emprestar para organizar suas faturas.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+                style: TextStyle(
+                  fontSize: 15,
+                  color: theme.colorScheme.secondary,
+                ),
               ),
-              const SizedBox(height: 20),
-
+              const SizedBox(height: 24),
               ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: _nomeControllers.length,
                 itemBuilder: (context, index) {
-                  return Card(
-                    margin: const EdgeInsets.symmetric(vertical: 10),
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(
+                  return Container(
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
                       borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark ? Colors.white10 : Colors.black12,
+                        width: 1,
+                      ),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(16.0),
@@ -154,43 +156,94 @@ class _ConfigInicialPageState extends State<ConfigInicialPage> {
                               Text(
                                 'Cartão Nº ${index + 1}',
                                 style: TextStyle(
-                                  fontSize: 18,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.blue.shade700,
+                                  color: theme.colorScheme.primary,
+                                  letterSpacing: -0.3,
                                 ),
                               ),
                               if (_nomeControllers.length > 1)
                                 IconButton(
-                                  icon: const Icon(
-                                    Icons.delete,
-                                    color: Colors.red,
+                                  icon: Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: theme.colorScheme.error,
                                   ),
                                   onPressed: () => _removerCartaoCampo(index),
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 16),
                           TextFormField(
                             controller: _nomeControllers[index],
-                            style: const TextStyle(fontSize: 18),
+                            style: TextStyle(
+                              color: theme.colorScheme.primary,
+                              fontSize: 16,
+                            ),
                             decoration: InputDecoration(
                               labelText: 'Nome do Cartão',
+                              labelStyle: TextStyle(
+                                color: theme.colorScheme.secondary.withValues(
+                                  alpha: 0.8,
+                                ),
+                              ),
                               hintText: _obterHintExemplo(index),
-                              border: const OutlineInputBorder(),
+                              filled: true,
+                              fillColor: theme.colorScheme.surface,
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: isDark
+                                      ? Colors.white10
+                                      : Colors.black12,
+                                  width: 1,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: theme.colorScheme.primary,
+                                  width: 1.5,
+                                ),
+                              ),
                             ),
                             validator: (v) => v == null || v.trim().isEmpty
-                                ? 'O nome do cartão é obrigatório'
+                                ? 'O nome é obrigatório'
                                 : null,
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
                           TextFormField(
                             controller: _fechControllers[index],
-                            style: const TextStyle(fontSize: 18),
+                            style: TextStyle(
+                              color: theme.colorScheme.primary,
+                              fontSize: 16,
+                            ),
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'Dia de Fechamento da Fatura',
-                              border: OutlineInputBorder(),
+                              labelStyle: TextStyle(
+                                color: theme.colorScheme.secondary.withValues(
+                                  alpha: 0.8,
+                                ),
+                              ),
                               hintText: 'Ex: 10',
+                              filled: true,
+                              fillColor: theme.colorScheme.surface,
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: isDark
+                                      ? Colors.white10
+                                      : Colors.black12,
+                                  width: 1,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: theme.colorScheme.primary,
+                                  width: 1.5,
+                                ),
+                              ),
                             ),
                             validator: _validarDia,
                           ),
@@ -200,42 +253,51 @@ class _ConfigInicialPageState extends State<ConfigInicialPage> {
                   );
                 },
               ),
-              const SizedBox(height: 12),
-
+              const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: _adicionarCartaoCampo,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: BorderSide(color: Colors.blue.shade700, width: 1.5),
+                  side: BorderSide(
+                    color: theme.colorScheme.primary,
+                    width: 1.2,
+                  ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                icon: Icon(Icons.add, color: Colors.blue.shade700),
+                icon: Icon(Icons.add_rounded, color: theme.colorScheme.primary),
                 label: Text(
                   'ADICIONAR OUTRO CARTÃO',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade700,
+                    color: theme.colorScheme.primary,
+                    letterSpacing: -0.2,
                   ),
                 ),
               ),
-              const SizedBox(height: 35),
-
+              const SizedBox(height: 36),
               ElevatedButton(
                 onPressed: _salvarConfiguracao,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade600,
-                  foregroundColor: Colors.white,
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: isDark
+                      ? const Color(0xFF1D1D1F)
+                      : Colors.white,
+                  elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
                 child: const Text(
                   'COMEÇAR A USAR',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.2,
+                  ),
                 ),
               ),
             ],

@@ -20,99 +20,88 @@ class MenuLateral extends StatelessWidget {
     required this.onCartoesAtualizados,
   });
 
-  Route _criarRotaSlide(Widget pagina, String nomeRota) {
-    return PageRouteBuilder(
+  Route _criarRotaNativa(Widget pagina, String nomeRota) {
+    return MaterialPageRoute(
       settings: RouteSettings(name: nomeRota),
-      pageBuilder: (context, animation, secondaryAnimation) => pagina,
-      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        const begin = Offset(1.0, 0.0);
-        const end = Offset.zero;
-        const curve = Curves.easeInOut;
-
-        var tween = Tween(
-          begin: begin,
-          end: end,
-        ).chain(CurveTween(curve: curve));
-
-        return SlideTransition(position: animation.drive(tween), child: child);
-      },
-      transitionDuration: const Duration(milliseconds: 300),
+      builder: (context) => pagina,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final String? rotaAtual = ModalRoute.of(context)?.settings.name;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Drawer(
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           DrawerHeader(
-            decoration: const BoxDecoration(
-              color: Color(0xFF1976D2), // Lógica do azul escuro absoluto fixado
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1D1D1F) : const Color(0xFFF5F5F7),
+              border: const Border(bottom: BorderSide.none),
             ),
-            child: const Column(
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.end,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Fatora',
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
+                    color: theme.colorScheme.primary,
+                    fontSize: 26,
                     fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'Menu de Opções',
-                  style: TextStyle(color: Colors.white70, fontSize: 16),
+                  style: TextStyle(
+                    color: theme.colorScheme.secondary.withValues(alpha: 0.7),
+                    fontSize: 14,
+                  ),
                 ),
               ],
             ),
           ),
           ListTile(
-            leading: const Icon(Icons.add_box, size: 28),
+            leading: Icon(
+              Icons.add_box_outlined,
+              color: theme.colorScheme.primary,
+            ),
             title: const Text(
               'Registrar Compra',
-              style: TextStyle(fontSize: 18),
+              style: TextStyle(fontSize: 16),
             ),
             onTap: () {
               Navigator.pop(context);
               if (rotaAtual != '/' && rotaAtual != 'HomePage') {
                 Navigator.pushReplacement(
                   context,
-                  PageRouteBuilder(
-                    settings: const RouteSettings(name: 'HomePage'),
-                    pageBuilder: (context, anim, seqAnim) => const HomePage(),
-                    transitionsBuilder: (context, anim, seqAnim, child) {
-                      return SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(1.0, 0.0),
-                          end: Offset.zero,
-                        ).animate(anim),
-                        child: child,
-                      );
-                    },
-                    transitionDuration: const Duration(milliseconds: 300),
-                  ),
+                  _criarRotaNativa(const HomePage(), 'HomePage'),
                 );
               }
             },
           ),
           ListTile(
-            leading: const Icon(Icons.history, size: 28),
+            leading: Icon(
+              Icons.history_rounded,
+              color: theme.colorScheme.primary,
+            ),
             title: const Text(
-              'Histórico de Compras',
-              style: TextStyle(fontSize: 18),
+              'Histórico de compras',
+              style: TextStyle(fontSize: 16),
             ),
             onTap: () {
               Navigator.pop(context);
               if (rotaAtual != 'HistoricoPage') {
                 Navigator.pushReplacement(
                   context,
-                  _criarRotaSlide(
+                  _criarRotaNativa(
                     HistoricoPage(
                       compras: compras,
                       onRemover: onRemoverCompra,
@@ -126,17 +115,20 @@ class MenuLateral extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.analytics, size: 28),
+            leading: Icon(
+              Icons.analytics_outlined,
+              color: theme.colorScheme.primary,
+            ),
             title: const Text(
-              'Resumo das Faturas',
-              style: TextStyle(fontSize: 18),
+              'Resumo das faturas',
+              style: TextStyle(fontSize: 16),
             ),
             onTap: () {
               Navigator.pop(context);
               if (rotaAtual != 'RelatorioPage') {
                 Navigator.pushReplacement(
                   context,
-                  _criarRotaSlide(
+                  _criarRotaNativa(
                     RelatorioPage(
                       compras: compras,
                       onRemover: onRemoverCompra,
@@ -150,17 +142,20 @@ class MenuLateral extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.people, size: 28),
+            leading: Icon(
+              Icons.people_outline_rounded,
+              color: theme.colorScheme.primary,
+            ),
             title: const Text(
-              'Total por Pessoa',
-              style: TextStyle(fontSize: 18),
+              'Total por pessoas',
+              style: TextStyle(fontSize: 16),
             ),
             onTap: () {
               Navigator.pop(context);
               if (rotaAtual != 'ResumoPessoaPage') {
                 Navigator.pushReplacement(
                   context,
-                  _criarRotaSlide(
+                  _criarRotaNativa(
                     ResumoPessoaPage(
                       compras: compras,
                       onRemover: onRemoverCompra,
@@ -174,19 +169,22 @@ class MenuLateral extends StatelessWidget {
             },
           ),
           const Spacer(),
-          const Divider(height: 1, thickness: 1),
+          const Divider(height: 1, thickness: 0.5),
           ListTile(
-            leading: const Icon(Icons.credit_card, size: 28),
+            leading: Icon(
+              Icons.credit_card_outlined,
+              color: theme.colorScheme.primary,
+            ),
             title: const Text(
               'Gerenciar Cartões',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 16),
             ),
             onTap: () {
               Navigator.pop(context);
               if (rotaAtual != 'GerenciarCartoesPage') {
                 Navigator.pushReplacement(
                   context,
-                  _criarRotaSlide(
+                  _criarRotaNativa(
                     GerenciarCartoesPage(onAtualizado: onCartoesAtualizados),
                     'GerenciarCartoesPage',
                   ),

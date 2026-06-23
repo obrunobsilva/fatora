@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../services/storage_service.dart';
 import '../models/compra_model.dart';
 import '../components/menu_lateral.dart';
-import '../main.dart';
 import 'home_page.dart';
 
 class GerenciarCartoesPage extends StatefulWidget {
@@ -106,24 +105,12 @@ class _GerenciarCartoesPageState extends State<GerenciarCartoesPage> {
     final resultado = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
-            SizedBox(width: 8),
-            Text('Aviso'),
-          ],
-        ),
-        content: const Text(
-          'Você precisa de pelo menos 1 cartão ativo.',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-        ),
+        title: const Text('Aviso'),
+        content: const Text('Você precisa de pelo menos 1 cartão ativo.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              'ENTENDI',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
+            child: const Text('ENTENDI'),
           ),
         ],
       ),
@@ -135,35 +122,18 @@ class _GerenciarCartoesPageState extends State<GerenciarCartoesPage> {
     final resultado = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.report_problem, color: Colors.red, size: 28),
-            SizedBox(width: 8),
-            Text('Atenção'),
-          ],
-        ),
+        title: const Text('Atenção'),
         content: Text(
           'O cartão "$nomeCartao" possui compras parceladas ativas. Se você excluir, essas contas sumirão do resumo.\n\nDeseja mesmo excluir?',
-          style: const TextStyle(fontSize: 16),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              'CANCELAR',
-              style: TextStyle(color: Colors.grey, fontSize: 16),
-            ),
+            child: const Text('CANCELAR'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'EXCLUIR MESMO ASSIM',
-              style: TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
+            child: const Text('EXCLUIR'),
           ),
         ],
       ),
@@ -176,168 +146,189 @@ class _GerenciarCartoesPageState extends State<GerenciarCartoesPage> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    final List<BoxShadow> profundidadeSutil = [
+      BoxShadow(
+        color: isDark
+            ? Colors.black.withValues(alpha: 0.5)
+            : Colors.black.withValues(alpha: 0.03),
+        blurRadius: 12,
+        offset: const Offset(0, 4),
+      ),
+    ];
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         Navigator.pushReplacement(
           context,
-          PageRouteBuilder(
-            settings: const RouteSettings(name: 'HomePage'),
-            pageBuilder: (context, anim, seqAnim) => const HomePage(),
-            transitionsBuilder: (context, anim, seqAnim, child) {
-              return SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(1.0, 0.0),
-                  end: Offset.zero,
-                ).animate(anim),
-                child: child,
-              );
-            },
-            transitionDuration: const Duration(milliseconds: 300),
-          ),
+          MaterialPageRoute(builder: (context) => const HomePage()),
         );
       },
-      child: SafeArea(
-        child: Scaffold(
-          key: _scaffoldKey,
-          appBar: AppBar(
-            title: const Text(
-              'Meus Cartões',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
-            ),
-            backgroundColor: isDark
-                ? const Color(0xFF1E1E1E)
-                : const Color(0xFF1976D2),
-            foregroundColor: Colors.white,
-            centerTitle: true,
-            elevation: 4.0, // Adicionado sombreado
-            shadowColor: isDark
-                ? Colors.black54
-                : Colors.black26, // Sombra adaptativa
-            toolbarHeight: 64.0, // Altura padronizada com respiro
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          title: const Text('Meus cartões'),
+          centerTitle: true,
+          backgroundColor: theme.appBarTheme.backgroundColor,
+          leading: IconButton(
+            icon: Icon(Icons.menu_rounded, color: theme.colorScheme.primary),
+            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
           ),
-          drawer: MenuLateral(
-            compras: _compras,
-            onRemoverCompra: (id) {},
-            onAdicionarCompra: (compra) {},
-            onCartoesAtualizados: _carregarDados,
-          ),
-          body: _cartoes.isEmpty
-              ? const Center(
-                  child: Text(
-                    'Nenhum cartão cadastrado.',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
+        ),
+        drawer: MenuLateral(
+          compras: _compras,
+          onRemoverCompra: (id) async {
+            setState(() {
+              _compras.removeWhere((item) => item.id == id);
+            });
+            await StorageService.salvarCompras(_compras);
+          },
+          onAdicionarCompra: (compra) async {
+            setState(() {
+              _compras.add(compra);
+              _compras.sort((a, b) => b.dataCompra.compareTo(a.dataCompra));
+            });
+            await StorageService.salvarCompras(_compras);
+          },
+          onCartoesAtualizados: _carregarDados,
+        ),
+        body: _cartoes.isEmpty
+            ? Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: profundidadeSutil,
+                    border: Border.all(
+                      color: isDark ? Colors.white10 : Colors.black12,
+                      width: 1,
+                    ),
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16.0),
-                  itemCount: _cartoes.length,
-                  itemBuilder: (context, index) {
-                    final item = _cartoes[index];
-                    return Dismissible(
-                      key: Key(item['nome'] + index.toString()),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade600,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        alignment: Alignment.centerRight,
-                        child: const Icon(
-                          Icons.delete,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                      confirmDismiss: (direction) async {
-                        if (_cartoes.length <= 1) {
-                          return await _exibirAvisoUltimoCartao();
-                        }
-                        final String nomeDoCartao = item['nome']
-                            .toString()
-                            .trim()
-                            .toLowerCase();
-                        final temComprasAtivas = _compras.any(
-                          (c) =>
-                              c.cartao.trim().toLowerCase() == nomeDoCartao &&
-                              c.estaAtiva,
-                        );
-                        if (temComprasAtivas) {
-                          return await _exibirAvisoComprasPendentes(
-                            item['nome'],
-                          );
-                        }
-                        return true;
-                      },
-                      onDismissed: (direction) {
-                        final cartaoRemovido = item;
-                        setState(() {
-                          _cartoes.removeAt(index);
-                        });
-                        _salvarEAtualizar();
-
-                        messengerKey.currentState?.clearSnackBars();
-                        messengerKey.currentState?.showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Cartão ${cartaoRemovido['nome']} removido',
-                            ),
-                            duration: const Duration(seconds: 3),
-                            action: SnackBarAction(
-                              label: 'DESFAZER',
-                              onPressed: () {
-                                setState(() {
-                                  _cartoes.insert(index, cartaoRemovido);
-                                });
-                                _salvarEAtualizar();
-                                messengerKey.currentState?.clearSnackBars();
-                              },
-                            ),
-                          ),
-                        );
-
-                        Future.delayed(const Duration(seconds: 3), () {
-                          if (!mounted) return;
-                          messengerKey.currentState?.clearSnackBars();
-                        });
-                      },
-                      child: Card(
-                        margin: const EdgeInsets.symmetric(vertical: 6),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ListTile(
-                          leading: const Icon(
-                            Icons.credit_card,
-                            size: 28,
-                            color: Colors.blue,
-                          ),
-                          title: Text(
-                            item['nome'],
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                            ),
-                          ),
-                          subtitle: Text(
-                            'Fecha todo dia ${item['fechamento']}',
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+                  child: const Text(
+                    'Nenhum cartão cadastrado.',
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
                 ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: _exibirDialogoAdicionar,
-            backgroundColor: isDark
-                ? const Color(0xFF1E1E1E)
-                : const Color(0xFF1976D2),
-            foregroundColor: Colors.white,
-            child: const Icon(Icons.add),
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+                itemCount: _cartoes.length,
+                itemBuilder: (context, index) {
+                  final item = _cartoes[index];
+                  return Dismissible(
+                    key: Key(item['nome'] + index.toString()),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.error.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      alignment: Alignment.centerRight,
+                      child: Icon(
+                        Icons.delete_outline_rounded,
+                        color: theme.colorScheme.error,
+                        size: 24,
+                      ),
+                    ),
+                    confirmDismiss: (direction) async {
+                      if (_cartoes.length <= 1) {
+                        await _exibirAvisoUltimoCartao();
+                        return false;
+                      }
+                      final String nomeDoCartao = item['nome']
+                          .toString()
+                          .trim()
+                          .toLowerCase();
+                      final int diaFechamento = item['fechamento'] as int;
+                      final temComprasAtivas = _compras.any(
+                        (c) =>
+                            c.cartao.trim().toLowerCase() == nomeDoCartao &&
+                            c.estaAtivaNoMes(DateTime.now(), diaFechamento),
+                      );
+                      if (temComprasAtivas) {
+                        return await _exibirAvisoComprasPendentes(item['nome']);
+                      }
+                      return true;
+                    },
+                    onDismissed: (direction) {
+                      setState(() {
+                        _cartoes.removeAt(index);
+                      });
+                      _salvarEAtualizar();
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 6),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: profundidadeSutil,
+                        border: Border.all(
+                          color: isDark ? Colors.white10 : Colors.black12,
+                          width: 1,
+                        ),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white10
+                                : const Color(0xFFF5F5F7),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.credit_card_rounded,
+                            color: theme.colorScheme.primary,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          item['nome'],
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            'Fecha todo dia ${item['fechamento']}',
+                            style: TextStyle(
+                              color: theme.colorScheme.secondary.withValues(
+                                alpha: 0.7,
+                              ),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: _exibirDialogoAdicionar,
+          backgroundColor: theme.colorScheme.primary,
+          foregroundColor: isDark ? const Color(0xFF1D1D1F) : Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
           ),
+          child: const Icon(Icons.add_rounded),
         ),
       ),
     );

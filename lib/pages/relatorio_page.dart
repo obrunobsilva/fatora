@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/compra_model.dart';
 import '../components/menu_lateral.dart';
@@ -63,14 +64,13 @@ class _RelatorioPageState extends State<RelatorioPage> {
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final Color corCalendario = isDark ? Colors.white : const Color(0xFF1976D2);
 
-    final NumberFormat currencyFormat = NumberFormat.currency(
+    final currencyFormat = NumberFormat.currency(
       locale: 'pt_BR',
       symbol: 'R\$',
     );
-    final DateFormat dateFormat = DateFormat('dd/MM');
-    final DateFormat nomeMesFormat = DateFormat("MMMM 'de' yyyy", 'pt_BR');
+    final dateFormat = DateFormat('dd/MM');
+    final nomeMesFormat = DateFormat("MMMM 'de' yyyy", 'pt_BR');
 
     final comprasDoMes = widget.compras.where((c) {
       final diaFech = _obterDiaFechamento(c.cartao);
@@ -90,319 +90,332 @@ class _RelatorioPageState extends State<RelatorioPage> {
       resumoAgrupado[compra.cartao]![parente]!.add(compra);
     }
 
+    final List<BoxShadow> profundidadeSutil = [
+      BoxShadow(
+        color: isDark
+            ? Colors.black.withValues(alpha: 0.5)
+            : Colors.black.withValues(alpha: 0.03),
+        blurRadius: 12,
+        offset: const Offset(0, 4),
+      ),
+      BoxShadow(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.01)
+            : Colors.white.withValues(alpha: 0.3),
+        blurRadius: 1,
+        offset: const Offset(0, -1),
+      ),
+    ];
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         Navigator.pushReplacement(
           context,
-          PageRouteBuilder(
-            settings: const RouteSettings(name: 'HomePage'),
-            pageBuilder: (context, anim, seqAnim) => const HomePage(),
-            transitionsBuilder: (context, anim, seqAnim, child) {
-              return SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(1.0, 0.0),
-                  end: Offset.zero,
-                ).animate(anim),
-                child: child,
-              );
-            },
-            transitionDuration: const Duration(milliseconds: 300),
-          ),
+          MaterialPageRoute(builder: (context) => const HomePage()),
         );
       },
-      child: SafeArea(
-        child: Scaffold(
-          key: _scaffoldKey,
-          appBar: AppBar(
-            title: const Text(
-              'Resumo da Fatura',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
-            ),
-            centerTitle: true,
-            backgroundColor: const Color(0xFF1976D2),
-            foregroundColor: Colors.white,
-            elevation: 4.0, // Adiciona o sombreado de profundidade
-            shadowColor: isDark
-                ? Colors.black54
-                : Colors.black26, // Sombra adaptativa
-            toolbarHeight: 64.0, // Aumenta a altura para dar respiro interno
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          backgroundColor: theme.appBarTheme.backgroundColor,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.menu_rounded, color: theme.colorScheme.primary),
+            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
           ),
-          drawer: MenuLateral(
-            compras: widget.compras,
-            onRemoverCompra: widget.onRemover,
-            onAdicionarCompra: widget.onAdicionar,
-            onCartoesAtualizados: () {
-              _carregarPrazosCartoes();
-              widget.onCartoesAtualizados();
-            },
-          ),
-          body: Column(
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                color: isDark ? const Color(0xFF1E1E1E) : Colors.blue.shade50,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 14,
-                  horizontal: 8,
-                ), // Aumentado o padding vertical
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        Icons.arrow_back_ios,
-                        size: 28,
-                        color: corCalendario,
-                      ),
-                      onPressed: () => setState(
-                        () => _mesVisualizado = DateTime(
-                          _mesVisualizado.year,
-                          _mesVisualizado.month - 1,
-                        ),
-                      ),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: Icon(
+                  Icons.arrow_back_ios_rounded,
+                  size: 14,
+                  color: theme.colorScheme.primary,
+                ),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  setState(
+                    () => _mesVisualizado = DateTime(
+                      _mesVisualizado.year,
+                      _mesVisualizado.month - 1,
                     ),
-                    Text(
-                      nomeMesFormat.format(_mesVisualizado).toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: corCalendario,
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.arrow_forward_ios,
-                        size: 28,
-                        color: corCalendario,
-                      ),
-                      onPressed: () => setState(
-                        () => _mesVisualizado = DateTime(
-                          _mesVisualizado.year,
-                          _mesVisualizado.month + 1,
-                        ),
-                      ),
-                    ),
-                  ],
+                  );
+                },
+              ),
+              const SizedBox(width: 16),
+              Text(
+                nomeMesFormat.format(_mesVisualizado).toUpperCase(),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.primary,
+                  letterSpacing: 0.5,
                 ),
               ),
-              Expanded(
-                child: comprasDoMes.isEmpty
-                    ? Center(
-                        child: Text(
-                          'Nenhuma conta para este mês.',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: theme.colorScheme.onSurfaceVariant,
+              const SizedBox(width: 16),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: theme.colorScheme.primary,
+                ),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  setState(
+                    () => _mesVisualizado = DateTime(
+                      _mesVisualizado.year,
+                      _mesVisualizado.month + 1,
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          centerTitle: true,
+        ),
+        drawer: MenuLateral(
+          compras: widget.compras,
+          onRemoverCompra: widget.onRemover,
+          onAdicionarCompra: widget.onAdicionar,
+          onCartoesAtualizados: () {
+            _carregarPrazosCartoes();
+            widget.onCartoesAtualizados();
+          },
+        ),
+        body: Column(
+          children: [
+            const SizedBox(height: 16),
+            Expanded(
+              child: comprasDoMes.isEmpty
+                  ? Center(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 24),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 32,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: profundidadeSutil,
+                          border: Border.all(
+                            color: isDark ? Colors.white10 : Colors.black12,
+                            width: 1,
                           ),
                         ),
-                      )
-                    : ListView(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        children: resumoAgrupado.keys.map((cartao) {
-                          final parentesGasto = resumoAgrupado[cartao]!;
-                          double totalCartao = 0;
-
-                          for (var listaCompras in parentesGasto.values) {
-                            for (var c in listaCompras) {
-                              totalCartao += c.valorParcela;
-                            }
-                          }
-
-                          return Card(
-                            margin: const EdgeInsets.symmetric(vertical: 6),
-                            elevation: 3,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.calendar_today_rounded,
+                              size: 32,
+                              color: theme.colorScheme.secondary.withValues(
+                                alpha: 0.4,
+                              ),
                             ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.credit_card,
-                                        color: Color(0xFF1976D2),
-                                        size: 28,
+                            const SizedBox(height: 14),
+                            Text(
+                              'Nenhuma conta para este mês',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.primary,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Os lançamentos do período aparecerão aqui',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: theme.colorScheme.secondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 4,
+                      ),
+                      children: resumoAgrupado.keys.map((cartao) {
+                        final parentesGasto = resumoAgrupado[cartao]!;
+                        double totalCartao = 0;
+
+                        for (var listaCompras in parentesGasto.values) {
+                          for (var c in listaCompras) {
+                            totalCartao += c.valorParcela;
+                          }
+                        }
+
+                        return Container(
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surface,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: profundidadeSutil,
+                            border: Border.all(
+                              color: isDark ? Colors.white10 : Colors.black12,
+                              width: 1,
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      cartao,
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: -0.3,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        cartao,
-                                        style: TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          color: theme.colorScheme.onSurface,
+                                    ),
+                                    Text(
+                                      currencyFormat.format(totalCartao),
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Divider(height: 24, thickness: 0.5),
+                                ...parentesGasto.entries.map((entry) {
+                                  final nomeParente = entry.key;
+                                  final listaDeComprasDoParente = entry.value;
+                                  double totalDoParente =
+                                      listaDeComprasDoParente.fold(
+                                        0,
+                                        (s, c) => s + c.valorParcela,
+                                      );
+
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 4.0,
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              nomeParente,
+                                              style: TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                                color:
+                                                    theme.colorScheme.secondary,
+                                              ),
+                                            ),
+                                            Text(
+                                              currencyFormat.format(
+                                                totalDoParente,
+                                              ),
+                                              style: const TextStyle(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  const Divider(height: 16, thickness: 1),
-                                  ...parentesGasto.entries.map((entry) {
-                                    final nomeParente = entry.key;
-                                    final listaDeComprasDoParente = entry.value;
-                                    double totalDoParente =
-                                        listaDeComprasDoParente.fold(
-                                          0,
-                                          (s, c) => s + c.valorParcela,
+                                      ...listaDeComprasDoParente.map((compra) {
+                                        final diaFech = _obterDiaFechamento(
+                                          compra.cartao,
                                         );
+                                        final parcNoMes = compra
+                                            .calcularParcelaNoMes(
+                                              _mesVisualizado,
+                                              diaFech,
+                                            );
+                                        final textParc =
+                                            compra.totalParcelas == 1
+                                            ? "À vista"
+                                            : (compra.ehAssinatura
+                                                  ? "Assinatura"
+                                                  : "$parcNoMes de ${compra.totalParcelas}");
 
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 2.0,
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
+                                        return Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 4.0,
+                                            horizontal: 8.0,
+                                          ),
+                                          child: Row(
                                             mainAxisAlignment:
                                                 MainAxisAlignment.spaceBetween,
                                             children: [
-                                              Text(
-                                                nomeParente,
-                                                style: const TextStyle(
-                                                  fontSize: 18,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Color(0xFF1976D2),
-                                                ),
-                                              ),
-                                              Text(
-                                                currencyFormat.format(
-                                                  totalDoParente,
-                                                ),
-                                                style: TextStyle(
-                                                  fontSize: 18,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: theme
-                                                      .colorScheme
-                                                      .onSurface,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          ...listaDeComprasDoParente.map((
-                                            compra,
-                                          ) {
-                                            final diaFech = _obterDiaFechamento(
-                                              compra.cartao,
-                                            );
-                                            final parcNoMes = compra
-                                                .calcularParcelaNoMes(
-                                                  _mesVisualizado,
-                                                  diaFech,
-                                                );
-                                            final String textoParcela =
-                                                compra.totalParcelas == 1
-                                                ? "À vista"
-                                                : (compra.ehAssinatura
-                                                      ? "Assinatura"
-                                                      : "$parcNoMes de ${compra.totalParcelas}");
-
-                                            return Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    vertical: 2.0,
-                                                    horizontal: 4.0,
-                                                  ),
-                                              child: Row(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment
-                                                        .spaceBetween,
+                                              Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Text(
-                                                          compra.local,
-                                                          style: TextStyle(
-                                                            fontSize: 15,
-                                                            fontWeight:
-                                                                FontWeight.w500,
-                                                            color: theme
-                                                                .colorScheme
-                                                                .onSurface,
-                                                          ),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                        ),
-                                                        Text(
-                                                          '${dateFormat.format(compra.dataCompra)} • $textoParcela',
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                            color: theme
-                                                                .colorScheme
-                                                                .onSurfaceVariant,
-                                                          ),
-                                                        ),
-                                                      ],
+                                                  Text(
+                                                    compra.local,
+                                                    style: const TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w500,
                                                     ),
                                                   ),
-                                                  const SizedBox(width: 8),
                                                   Text(
-                                                    currencyFormat.format(
-                                                      compra.valorParcela,
-                                                    ),
+                                                    '${dateFormat.format(compra.dataCompra)} • $textParc',
                                                     style: TextStyle(
-                                                      fontSize: 15,
-                                                      fontWeight:
-                                                          FontWeight.w600,
+                                                      fontSize: 12,
                                                       color: theme
                                                           .colorScheme
-                                                          .onSurface,
+                                                          .secondary
+                                                          .withValues(
+                                                            alpha: 0.7,
+                                                          ),
                                                     ),
                                                   ),
                                                 ],
                                               ),
-                                            );
-                                          }),
-                                          const SizedBox(height: 6),
-                                        ],
-                                      ),
-                                    );
-                                  }),
-                                  const Divider(height: 16, thickness: 1),
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Total da Fatura:',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: theme
-                                              .colorScheme
-                                              .onSurfaceVariant,
-                                        ),
-                                      ),
-                                      Text(
-                                        currencyFormat.format(totalCartao),
-                                        style: const TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF1976D2),
-                                        ),
-                                      ),
+                                              Text(
+                                                currencyFormat.format(
+                                                  compra.valorParcela,
+                                                ),
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }),
+                                      const SizedBox(height: 8),
                                     ],
-                                  ),
-                                ],
-                              ),
+                                  );
+                                }),
+                              ],
                             ),
-                          );
-                        }).toList(),
-                      ),
-              ),
-            ],
-          ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+            ),
+          ],
         ),
       ),
     );

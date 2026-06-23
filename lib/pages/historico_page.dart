@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:fatora/main.dart';
 import '../models/compra_model.dart';
 import '../components/menu_lateral.dart';
-import '../main.dart';
 import 'home_page.dart';
 
 class HistoricoPage extends StatefulWidget {
@@ -54,22 +54,14 @@ class _HistoricoPageState extends State<HistoricoPage> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
+        if (didPop) {
+          return;
+        }
         Navigator.pushReplacement(
           context,
-          PageRouteBuilder(
+          MaterialPageRoute(
             settings: const RouteSettings(name: 'HomePage'),
-            pageBuilder: (context, anim, seqAnim) => const HomePage(),
-            transitionsBuilder: (context, anim, seqAnim, child) {
-              return SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(-1.0, 0.0),
-                  end: Offset.zero,
-                ).animate(anim),
-                child: child,
-              );
-            },
-            transitionDuration: const Duration(milliseconds: 300),
+            builder: (context) => const HomePage(),
           ),
         );
       },
@@ -77,18 +69,11 @@ class _HistoricoPageState extends State<HistoricoPage> {
         child: Scaffold(
           key: _scaffoldKey,
           appBar: AppBar(
-            title: const Text(
-              'Histórico de Compras',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
+            title: const Text('Histórico'),
+            leading: IconButton(
+              icon: Icon(Icons.menu_rounded, color: theme.colorScheme.primary),
+              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             ),
-            centerTitle: true,
-            backgroundColor: const Color(0xFF1976D2),
-            foregroundColor: Colors.white,
-            elevation: 4.0, // Adicionado sombreado
-            shadowColor: isDark
-                ? Colors.black54
-                : Colors.black26, // Sombra adaptativa
-            toolbarHeight: 64.0, // Altura padronizada com respiro
           ),
           drawer: MenuLateral(
             compras: widget.compras,
@@ -100,21 +85,54 @@ class _HistoricoPageState extends State<HistoricoPage> {
             children: [
               if (widget.compras.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20.0,
+                    vertical: 12.0,
+                  ),
                   child: TextField(
                     controller: _buscaController,
                     textCapitalization: TextCapitalization.words,
-                    style: const TextStyle(fontSize: 18),
+                    style: TextStyle(
+                      color: theme.colorScheme.primary,
+                      fontSize: 16,
+                    ),
                     decoration: InputDecoration(
-                      labelText: 'Pesquisar...',
-                      hintText: 'Digite o nome, local ou cartão',
-                      prefixIcon: const Icon(Icons.search, size: 28),
-                      border: OutlineInputBorder(
+                      labelText: 'Pesquisar despesas...',
+                      labelStyle: TextStyle(
+                        color: theme.colorScheme.secondary.withValues(
+                          alpha: 0.8,
+                        ),
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        color: theme.colorScheme.secondary,
+                      ),
+                      filled: true,
+                      fillColor: theme.colorScheme.surface,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDark ? Colors.white10 : Colors.black12,
+                          width: 1,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: theme.colorScheme.primary,
+                          width: 1.5,
+                        ),
                       ),
                       suffixIcon: _textoBusca.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear),
+                              icon: Icon(
+                                Icons.clear_rounded,
+                                color: theme.colorScheme.secondary,
+                              ),
                               onPressed: () {
                                 setState(() {
                                   _buscaController.clear();
@@ -133,21 +151,32 @@ class _HistoricoPageState extends State<HistoricoPage> {
                 ),
               Expanded(
                 child: widget.compras.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text(
-                          'Nenhuma compra registrada ainda.',
-                          style: TextStyle(fontSize: 18, color: Colors.grey),
+                          'Nenhuma compra registrada ainda',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: theme.colorScheme.secondary,
+                            letterSpacing: -0.2,
+                          ),
                         ),
                       )
                     : comprasFiltradas.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text(
-                          'Nenhum resultado encontrado.',
-                          style: TextStyle(fontSize: 18, color: Colors.grey),
+                          'Nenhum resultado encontrado',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: theme.colorScheme.secondary,
+                            letterSpacing: -0.2,
+                          ),
                         ),
                       )
                     : ListView.builder(
-                        padding: const EdgeInsets.all(16.0),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20.0,
+                          vertical: 8.0,
+                        ),
                         itemCount: comprasFiltradas.length,
                         itemBuilder: (context, index) {
                           final item = comprasFiltradas[index];
@@ -163,14 +192,16 @@ class _HistoricoPageState extends State<HistoricoPage> {
                                 horizontal: 20,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.red.shade600,
-                                borderRadius: BorderRadius.circular(12),
+                                color: theme.colorScheme.error.withValues(
+                                  alpha: 0.15,
+                                ),
+                                borderRadius: BorderRadius.circular(14),
                               ),
                               alignment: Alignment.centerRight,
-                              child: const Icon(
-                                Icons.delete,
-                                color: Colors.white,
-                                size: 28,
+                              child: Icon(
+                                Icons.delete_outline_rounded,
+                                color: theme.colorScheme.error,
+                                size: 24,
                               ),
                             ),
                             onDismissed: (direction) {
@@ -182,18 +213,30 @@ class _HistoricoPageState extends State<HistoricoPage> {
                               setState(() {
                                 widget.onRemover(item.id);
                               });
-
                               messengerKey.currentState?.clearSnackBars();
                               messengerKey.currentState?.showSnackBar(
                                 SnackBar(
+                                  behavior: SnackBarBehavior.floating,
+                                  margin: const EdgeInsets.all(16.0),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  backgroundColor: theme.colorScheme.primary,
+                                  duration: const Duration(seconds: 2),
                                   content: Text(
                                     'Compra de ${compraRemovida.parente} removida',
-                                    style: const TextStyle(fontSize: 16),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark
+                                          ? const Color(0xFF1D1D1F)
+                                          : Colors.white,
+                                    ),
                                   ),
-                                  duration: const Duration(seconds: 3),
                                   action: SnackBarAction(
                                     label: 'DESFAZER',
-                                    textColor: Colors.amber,
+                                    textColor: isDark
+                                        ? Colors.blue.shade400
+                                        : Colors.blue.shade300,
                                     onPressed: () {
                                       setState(() {
                                         widget.onAdicionar(compraRemovida);
@@ -213,37 +256,65 @@ class _HistoricoPageState extends State<HistoricoPage> {
                                 ),
                               );
 
-                              Future.delayed(const Duration(seconds: 3), () {
-                                if (!mounted) return;
+                              Future.delayed(const Duration(seconds: 2), () {
+                                if (!mounted) {
+                                  return;
+                                }
                                 messengerKey.currentState?.clearSnackBars();
                               });
                             },
-                            child: Card(
+                            child: Container(
                               margin: const EdgeInsets.symmetric(vertical: 6),
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surface,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isDark
+                                      ? Colors.white10
+                                      : Colors.black12,
+                                  width: 1,
+                                ),
                               ),
                               child: ListTile(
-                                leading: const CircleAvatar(
-                                  backgroundColor: Color(0xFF1976D2),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 6,
+                                ),
+                                leading: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? Colors.white10
+                                        : const Color(0xFFF5F5F7),
+                                    shape: BoxShape.circle,
+                                  ),
                                   child: Icon(
-                                    Icons.credit_card,
-                                    color: Colors.white,
+                                    Icons.credit_card_rounded,
+                                    color: theme.colorScheme.primary,
                                     size: 20,
                                   ),
                                 ),
                                 title: Text(
                                   item.parente,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 18,
+                                    fontSize: 16,
+                                    color: theme.colorScheme.primary,
+                                    letterSpacing: -0.3,
                                   ),
                                 ),
-                                subtitle: Text(
-                                  item.ehAssinatura
-                                      ? '${item.local} • Assinatura Mensal'
-                                      : '${item.local} • Parcela ${item.parcelaAtual} de ${item.totalParcelas}',
+                                subtitle: Padding(
+                                  padding: const EdgeInsets.only(top: 4.0),
+                                  child: Text(
+                                    item.ehAssinatura
+                                        ? '${item.local} • Assinatura'
+                                        : '${item.local} • Parcela ${item.parcelaAtual} de ${item.totalParcelas}',
+                                    style: TextStyle(
+                                      color: theme.colorScheme.secondary
+                                          .withValues(alpha: 0.7),
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                 ),
                                 trailing: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -251,17 +322,20 @@ class _HistoricoPageState extends State<HistoricoPage> {
                                   children: [
                                     Text(
                                       _currencyFormat.format(item.valorTotal),
-                                      style: const TextStyle(
-                                        color: Colors.red,
+                                      style: TextStyle(
+                                        color: theme.colorScheme.primary,
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+                                        fontSize: 15,
+                                        letterSpacing: -0.2,
                                       ),
                                     ),
+                                    const SizedBox(height: 4),
                                     Text(
                                       dataCurtaFormat.format(item.dataCompra),
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.grey.shade600,
+                                        color: theme.colorScheme.secondary
+                                            .withValues(alpha: 0.7),
                                       ),
                                     ),
                                   ],

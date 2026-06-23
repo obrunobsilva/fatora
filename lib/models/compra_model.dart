@@ -39,28 +39,19 @@ class CompraModel {
     final diferencaMeses =
         (mesAlvo.year - dataInicioFaturamento.year) * 12 +
         (mesAlvo.month - dataInicioFaturamento.month);
-    final parcela = diferencaMeses + 1;
-
-    return parcela;
+    return diferencaMeses + 1;
   }
 
   bool estaAtivaNoMes(DateTime mesAlvo, int diaFechamento) {
     if (ehAssinatura) {
-      DateTime dataInicioFaturamento = DateTime(
+      final DateTime dataFiltroAlvo = DateTime(mesAlvo.year, mesAlvo.month);
+      final DateTime dataFiltroCompra = DateTime(
         dataCompra.year,
         dataCompra.month,
-        diaFechamento,
       );
-      if (dataCompra.day >= diaFechamento) {
-        dataInicioFaturamento = DateTime(
-          dataCompra.year,
-          dataCompra.month + 1,
-          diaFechamento,
-        );
-      }
-      return mesAlvo.isAfter(dataInicioFaturamento) ||
-          (mesAlvo.year == dataInicioFaturamento.year &&
-              mesAlvo.month == dataInicioFaturamento.month);
+      return dataFiltroAlvo.isAfter(dataFiltroCompra) ||
+          (dataFiltroAlvo.year == dataFiltroCompra.year &&
+              dataFiltroAlvo.month == dataFiltroCompra.month);
     }
 
     final parcela = calcularParcelaNoMes(mesAlvo, diaFechamento);
@@ -82,11 +73,11 @@ class CompraModel {
   }
 
   int get parcelaAtual {
-    return obterParcelaAtualDinamica(25);
+    return obterParcelaAtualDinamica(15);
   }
 
   bool get estaAtiva {
-    return verificarSeEstaAtivaDinamica(25);
+    return verificarSeEstaAtivaDinamica(15);
   }
 
   double get valorParcela =>

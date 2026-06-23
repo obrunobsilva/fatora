@@ -27,23 +27,52 @@ class FatoraApp extends StatelessWidget {
       title: 'Fatora',
       scaffoldMessengerKey: messengerKey,
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.system, // Segue o tema do celular automaticamente
+      themeMode: ThemeMode.system,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue.shade700,
-          brightness: Brightness.light,
-        ),
         useMaterial3: true,
-        scaffoldBackgroundColor: Colors.white,
+        scaffoldBackgroundColor: const Color(0xFFF2F2F7),
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF1D1D1F),
+          secondary: Color(0xFF6E6E73),
+          surface: Colors.white,
+          error: Color(0xFFFF453A),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFFF2F2F7),
+          foregroundColor: Color(0xFF1D1D1F),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1D1D1F),
+            letterSpacing: -0.5,
+          ),
+        ),
       ),
       darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue.shade400,
-          brightness: Brightness.dark,
-          surface: const Color(0xFF1E1E1E),
-        ),
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFF121212),
+        scaffoldBackgroundColor: const Color(0xFF000000),
+        colorScheme: const ColorScheme.dark(
+          primary: Colors.white,
+          secondary: Color(0xFF86868B),
+          surface: Color(0xFF1D1D1F),
+          error: Color(0xFFFF453A),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF000000),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          centerTitle: true,
+          titleTextStyle: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+            letterSpacing: -0.5,
+          ),
+        ),
       ),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
