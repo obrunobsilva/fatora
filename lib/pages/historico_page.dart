@@ -51,37 +51,46 @@ class _HistoricoPageState extends State<HistoricoPage> {
       return porParente || porLocal || porCartao;
     }).toList();
 
+    final List<BoxShadow> profundidadeSutil = [
+      BoxShadow(
+        color: isDark
+            ? Colors.black.withValues(alpha: 0.5)
+            : Colors.black.withValues(alpha: 0.03),
+        blurRadius: 12,
+        offset: const Offset(0, 4),
+      ),
+    ];
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        if (didPop) {
-          return;
-        }
+        if (didPop) return;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            settings: const RouteSettings(name: 'HomePage'),
-            builder: (context) => const HomePage(),
-          ),
+          MaterialPageRoute(builder: (context) => const HomePage()),
         );
       },
-      child: SafeArea(
-        child: Scaffold(
-          key: _scaffoldKey,
-          appBar: AppBar(
-            title: const Text('Histórico'),
-            leading: IconButton(
-              icon: Icon(Icons.menu_rounded, color: theme.colorScheme.primary),
-              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-            ),
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: AppBar(
+          title: const Text('Histórico de compras'),
+          centerTitle: true,
+          backgroundColor: theme.appBarTheme.backgroundColor,
+          leading: IconButton(
+            icon: Icon(Icons.menu_rounded, color: theme.colorScheme.primary),
+            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
           ),
-          drawer: MenuLateral(
-            compras: widget.compras,
-            onRemoverCompra: widget.onRemover,
-            onAdicionarCompra: widget.onAdicionar,
-            onCartoesAtualizados: widget.onCartoesAtualizados,
-          ),
-          body: Column(
+        ),
+        drawer: MenuLateral(
+          compras: widget.compras,
+          onRemoverCompra: widget.onRemover,
+          onAdicionarCompra: widget.onAdicionar,
+          onCartoesAtualizados: widget.onCartoesAtualizados,
+        ),
+        body: SafeArea(
+          bottom: true,
+          child: Column(
             children: [
               if (widget.compras.isNotEmpty)
                 Padding(
@@ -89,64 +98,70 @@ class _HistoricoPageState extends State<HistoricoPage> {
                     horizontal: 20.0,
                     vertical: 12.0,
                   ),
-                  child: TextField(
-                    controller: _buscaController,
-                    textCapitalization: TextCapitalization.words,
-                    style: TextStyle(
-                      color: theme.colorScheme.primary,
-                      fontSize: 16,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: profundidadeSutil,
                     ),
-                    decoration: InputDecoration(
-                      labelText: 'Pesquisar despesas...',
-                      labelStyle: TextStyle(
-                        color: theme.colorScheme.secondary.withValues(
-                          alpha: 0.8,
+                    child: TextField(
+                      controller: _buscaController,
+                      textCapitalization: TextCapitalization.words,
+                      style: TextStyle(
+                        color: theme.colorScheme.primary,
+                        fontSize: 16,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Pesquisar despesas...',
+                        labelStyle: TextStyle(
+                          color: theme.colorScheme.secondary.withValues(
+                            alpha: 0.8,
+                          ),
                         ),
-                      ),
-                      prefixIcon: Icon(
-                        Icons.search_rounded,
-                        color: theme.colorScheme.secondary,
-                      ),
-                      filled: true,
-                      fillColor: theme.colorScheme.surface,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: isDark ? Colors.white10 : Colors.black12,
-                          width: 1,
+                        prefixIcon: Icon(
+                          Icons.search_rounded,
+                          color: theme.colorScheme.secondary,
                         ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: theme.colorScheme.primary,
-                          width: 1.5,
+                        filled: true,
+                        fillColor: theme.colorScheme.surface,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
                         ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: isDark ? Colors.white10 : Colors.black12,
+                            width: 1,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.primary,
+                            width: 1.5,
+                          ),
+                        ),
+                        suffixIcon: _textoBusca.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear_rounded,
+                                  color: theme.colorScheme.secondary,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _buscaController.clear();
+                                    _textoBusca = '';
+                                  });
+                                },
+                              )
+                            : null,
                       ),
-                      suffixIcon: _textoBusca.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(
-                                Icons.clear_rounded,
-                                color: theme.colorScheme.secondary,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _buscaController.clear();
-                                  _textoBusca = '';
-                                });
-                              },
-                            )
-                          : null,
+                      onChanged: (valor) {
+                        setState(() {
+                          _textoBusca = valor;
+                        });
+                      },
                     ),
-                    onChanged: (valor) {
-                      setState(() {
-                        _textoBusca = valor;
-                      });
-                    },
                   ),
                 ),
               Expanded(
@@ -175,7 +190,7 @@ class _HistoricoPageState extends State<HistoricoPage> {
                     : ListView.builder(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 20.0,
-                          vertical: 8.0,
+                          vertical: 4.0,
                         ),
                         itemCount: comprasFiltradas.length,
                         itemBuilder: (context, index) {
@@ -209,7 +224,6 @@ class _HistoricoPageState extends State<HistoricoPage> {
                               final indexOriginal = widget.compras.indexOf(
                                 item,
                               );
-
                               setState(() {
                                 widget.onRemover(item.id);
                               });
@@ -255,19 +269,13 @@ class _HistoricoPageState extends State<HistoricoPage> {
                                   ),
                                 ),
                               );
-
-                              Future.delayed(const Duration(seconds: 2), () {
-                                if (!mounted) {
-                                  return;
-                                }
-                                messengerKey.currentState?.clearSnackBars();
-                              });
                             },
                             child: Container(
                               margin: const EdgeInsets.symmetric(vertical: 6),
                               decoration: BoxDecoration(
                                 color: theme.colorScheme.surface,
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: profundidadeSutil,
                                 border: Border.all(
                                   color: isDark
                                       ? Colors.white10

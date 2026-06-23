@@ -191,78 +191,41 @@ class _RelatorioPageState extends State<RelatorioPage> {
             widget.onCartoesAtualizados();
           },
         ),
-        body: Column(
-          children: [
-            const SizedBox(height: 16),
-            Expanded(
-              child: comprasDoMes.isEmpty
-                  ? Center(
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 24),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 32,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: profundidadeSutil,
-                          border: Border.all(
-                            color: isDark ? Colors.white10 : Colors.black12,
-                            width: 1,
+        body: SafeArea(
+          bottom: true,
+          child: Column(
+            children: [
+              Container(
+                color: theme.colorScheme.surface,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      nomeMesFormat.format(_mesVisualizado).toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.primary,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: comprasDoMes.isEmpty
+                    ? Center(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 24),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 32,
                           ),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.calendar_today_rounded,
-                              size: 32,
-                              color: theme.colorScheme.secondary.withValues(
-                                alpha: 0.4,
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              'Nenhuma conta para este mês',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: theme.colorScheme.primary,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Os lançamentos do período aparecerão aqui',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: theme.colorScheme.secondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 4,
-                      ),
-                      children: resumoAgrupado.keys.map((cartao) {
-                        final parentesGasto = resumoAgrupado[cartao]!;
-                        double totalCartao = 0;
-
-                        for (var listaCompras in parentesGasto.values) {
-                          for (var c in listaCompras) {
-                            totalCartao += c.valorParcela;
-                          }
-                        }
-
-                        return Container(
-                          margin: const EdgeInsets.symmetric(vertical: 6),
                           decoration: BoxDecoration(
                             color: theme.colorScheme.surface,
                             borderRadius: BorderRadius.circular(16),
@@ -272,150 +235,214 @@ class _RelatorioPageState extends State<RelatorioPage> {
                               width: 1,
                             ),
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      cartao,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: -0.3,
-                                      ),
-                                    ),
-                                    Text(
-                                      currencyFormat.format(totalCartao),
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.calendar_today_rounded,
+                                size: 32,
+                                color: theme.colorScheme.secondary.withValues(
+                                  alpha: 0.4,
                                 ),
-                                const Divider(height: 24, thickness: 0.5),
-                                ...parentesGasto.entries.map((entry) {
-                                  final nomeParente = entry.key;
-                                  final listaDeComprasDoParente = entry.value;
-                                  double totalDoParente =
-                                      listaDeComprasDoParente.fold(
-                                        0,
-                                        (s, c) => s + c.valorParcela,
-                                      );
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                'Nenhuma conta para este mês',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.colorScheme.primary,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Os lançamentos do período aparecerão aqui',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: theme.colorScheme.secondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 4,
+                        ),
+                        children: resumoAgrupado.keys.map((cartao) {
+                          final parentesGasto = resumoAgrupado[cartao]!;
+                          double totalCartao = 0;
 
-                                  return Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                          for (var listaCompras in parentesGasto.values) {
+                            for (var c in listaCompras) {
+                              totalCartao += c.valorParcela;
+                            }
+                          }
+
+                          return Container(
+                            margin: const EdgeInsets.symmetric(vertical: 6),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surface,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: profundidadeSutil,
+                              border: Border.all(
+                                color: isDark ? Colors.white10 : Colors.black12,
+                                width: 1,
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 4.0,
-                                        ),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              nomeParente,
-                                              style: TextStyle(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w600,
-                                                color:
-                                                    theme.colorScheme.secondary,
-                                              ),
-                                            ),
-                                            Text(
-                                              currencyFormat.format(
-                                                totalDoParente,
-                                              ),
-                                              style: const TextStyle(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
+                                      Text(
+                                        cartao,
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: -0.3,
                                         ),
                                       ),
-                                      ...listaDeComprasDoParente.map((compra) {
-                                        final diaFech = _obterDiaFechamento(
-                                          compra.cartao,
+                                      Text(
+                                        currencyFormat.format(totalCartao),
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const Divider(height: 24, thickness: 0.5),
+                                  ...parentesGasto.entries.map((entry) {
+                                    final nomeParente = entry.key;
+                                    final listaDeComprasDoParente = entry.value;
+                                    double totalDoParente =
+                                        listaDeComprasDoParente.fold(
+                                          0,
+                                          (s, c) => s + c.valorParcela,
                                         );
-                                        final parcNoMes = compra
-                                            .calcularParcelaNoMes(
-                                              _mesVisualizado,
-                                              diaFech,
-                                            );
-                                        final textParc =
-                                            compra.totalParcelas == 1
-                                            ? "À vista"
-                                            : (compra.ehAssinatura
-                                                  ? "Assinatura"
-                                                  : "$parcNoMes de ${compra.totalParcelas}");
 
-                                        return Padding(
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Padding(
                                           padding: const EdgeInsets.symmetric(
                                             vertical: 4.0,
-                                            horizontal: 8.0,
                                           ),
                                           child: Row(
                                             mainAxisAlignment:
                                                 MainAxisAlignment.spaceBetween,
                                             children: [
-                                              Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    compra.local,
-                                                    style: const TextStyle(
-                                                      fontSize: 14,
-                                                      fontWeight:
-                                                          FontWeight.w500,
-                                                    ),
-                                                  ),
-                                                  Text(
-                                                    '${dateFormat.format(compra.dataCompra)} • $textParc',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: theme
-                                                          .colorScheme
-                                                          .secondary
-                                                          .withValues(
-                                                            alpha: 0.7,
-                                                          ),
-                                                    ),
-                                                  ),
-                                                ],
+                                              Text(
+                                                nomeParente,
+                                                style: TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: theme
+                                                      .colorScheme
+                                                      .secondary,
+                                                ),
                                               ),
                                               Text(
                                                 currencyFormat.format(
-                                                  compra.valorParcela,
+                                                  totalDoParente,
                                                 ),
                                                 style: const TextStyle(
-                                                  fontSize: 14,
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w600,
                                                 ),
                                               ),
                                             ],
                                           ),
-                                        );
-                                      }),
-                                      const SizedBox(height: 8),
-                                    ],
-                                  );
-                                }),
-                              ],
+                                        ),
+                                        ...listaDeComprasDoParente.map((
+                                          compra,
+                                        ) {
+                                          final diaFech = _obterDiaFechamento(
+                                            compra.cartao,
+                                          );
+                                          final parcNoMes = compra
+                                              .calcularParcelaNoMes(
+                                                _mesVisualizado,
+                                                diaFech,
+                                              );
+                                          final textParc =
+                                              compra.totalParcelas == 1
+                                              ? "À vista"
+                                              : (compra.ehAssinatura
+                                                    ? "Assinatura"
+                                                    : "$parcNoMes de ${compra.totalParcelas}");
+                                          return Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 4.0,
+                                              horizontal: 8.0,
+                                            ),
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      compra.local,
+                                                      style: const TextStyle(
+                                                        fontSize: 14,
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      '${dateFormat.format(compra.dataCompra)} • $textParc',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: theme
+                                                            .colorScheme
+                                                            .secondary
+                                                            .withValues(
+                                                              alpha: 0.7,
+                                                            ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                Text(
+                                                  currencyFormat.format(
+                                                    compra.valorParcela,
+                                                  ),
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }),
+                                        const SizedBox(height: 8),
+                                      ],
+                                    );
+                                  }),
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-            ),
-          ],
+                          );
+                        }).toList(),
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
