@@ -1,12 +1,15 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:fatora/main.dart';
 import '../models/compra_model.dart';
+import '../components/campo_padrao.dart';
 import '../components/seletor_cartao.dart';
 import '../components/seletor_parcelas.dart';
 import '../components/seletor_parcela_atual.dart';
 import '../components/menu_lateral.dart';
 import '../services/storage_service.dart';
+import '../utils/formatadores.dart';
+import 'gerenciar_cartoes_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -16,22 +19,26 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  static const int _maxParcelas = 48;
+
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  final TextEditingController _parenteController = TextEditingController();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _pessoaController = TextEditingController();
+  final FocusNode _pessoaFocus = FocusNode();
   final TextEditingController _valorController = TextEditingController();
   final TextEditingController _localController = TextEditingController();
 
   String _cartaoSelecionado = '';
   List<String> _nomesCartoes = [];
-  int _parcelasSelecionadas = 1;
-  int _parcelaAtualSelecionada = 1;
-  bool _inserirPorValorParcela = false;
-  bool _ehAssinaturaRecorrente = false;
   List<CompraModel> _compras = [];
-  final _formKey = GlobalKey<FormState>();
 
-  double _escalaSwitchParcela = 1.0;
-  double _escalaSwitchAssinatura = 1.0;
+  int _parcelasSelecionadas = 1;
+  int _parcelaInicial = 1;
+  bool _porValorParcela = false;
+  bool _assinatura = false;
+
+  bool _carregando = true;
+  bool _erro = false;
 
   @override
   void initState() {
@@ -39,127 +46,105 @@ class _HomePageState extends State<HomePage> {
     _carregarDadosIniciais();
   }
 
+  @override
+  void dispose() {
+    _pessoaController.dispose();
+    _pessoaFocus.dispose();
+    _valorController.dispose();
+    _localController.dispose();
+    super.dispose();
+  }
+
   Future<void> _carregarDadosIniciais() async {
     try {
-      final dadosCarregados = await StorageService.carregarCompras();
-      final configCartoes = await StorageService.obterConfiguracaoCartoes();
-      final List<String> nomesExtraidos = configCartoes
-          .map((c) => c['nome'] as String)
-          .toList();
-
-      if (!mounted) {
-        return;
-      }
-
+      final compras = await StorageService.carregarCompras();
+      final cartoes = await StorageService.obterConfiguracaoCartoes();
+      if (!mounted) return;
+      final nomes = cartoes.map((c) => c['nome'] as String).toList();
       setState(() {
-        _compras = dadosCarregados;
-        _nomesCartoes = nomesExtraidos;
-        if (_nomesCartoes.isNotEmpty && _cartaoSelecionado.isEmpty) {
-          _cartaoSelecionado = _nomesCartoes.first;
+        _compras = compras;
+        _nomesCartoes = nomes;
+        if (!nomes.contains(_cartaoSelecionado)) {
+          _cartaoSelecionado = nomes.isEmpty ? '' : nomes.first;
         }
+        _carregando = false;
+        _erro = false;
       });
     } catch (e) {
-      debugPrint("Erro: $e");
+      debugPrint('Erro ao carregar dados: $e');
+      if (!mounted) return;
+      setState(() {
+        _carregando = false;
+        _erro = true;
+      });
     }
   }
 
   Future<void> _salvarCompra() async {
-    if (!_formKey.currentState!.validate()) {
+    if (!_formKey.currentState!.validate()) return;
+
+    final centavosDigitados = lerCentavos(_valorController.text);
+    if (centavosDigitados == null || centavosDigitados <= 0) {
+      mostrarAviso(context, 'Informe um valor maior que zero.');
       return;
     }
-
     FocusScope.of(context).unfocus();
 
-    final valorLimpo = _valorController.text.replaceAll(',', '.');
-    final double? valorDigitado = double.tryParse(valorLimpo);
-    if (valorDigitado == null || valorDigitado <= 0) {
-      return;
-    }
+    // Parcelas só valem quando o switch "valor da parcela" está ligado.
+    final bool parcelado = !_assinatura && _porValorParcela;
+    final parcelas = _assinatura
+        ? CompraModel.tipoAssinatura
+        : (parcelado ? _parcelasSelecionadas : 1);
+    final totalCentavos = parcelado
+        ? centavosDigitados * _parcelasSelecionadas
+        : centavosDigitados;
 
-    double valorTotalCalculado = valorDigitado;
-    int parcelasFinais = _ehAssinaturaRecorrente ? 999 : _parcelasSelecionadas;
-    if (_inserirPorValorParcela && !_ehAssinaturaRecorrente) {
-      valorTotalCalculado = valorDigitado * _parcelasSelecionadas;
-    }
-
-    DateTime dataBase = DateTime.now();
-
-    if (!_ehAssinaturaRecorrente && _parcelaAtualSelecionada > 1) {
-      dataBase = DateTime(
-        dataBase.year,
-        dataBase.month - (_parcelaAtualSelecionada - 1),
-        dataBase.day,
-      );
-    }
-
-    final novaCompra = CompraModel(
-      id: DateTime.now().toString(),
-      parente: _parenteController.text.trim(),
-      valorTotal: valorTotalCalculado,
-      local: _localController.text.trim(),
+    final nova = CompraModel(
+      id: StorageService.novoId(),
+      parente: canonicalizarNome(
+        _pessoaController.text,
+        StorageService.nomesPessoas(_compras),
+      ),
+      valorTotalCentavos: totalCentavos,
+      local: limparNome(_localController.text),
       cartao: _cartaoSelecionado,
-      totalParcelas: parcelasFinais,
-      dataCompra: dataBase,
+      totalParcelas: parcelas,
+      // Só vale para compra parcelada; à vista e assinatura começam na 1.
+      parcelaInicial: (parcelado && _parcelasSelecionadas > 1)
+          ? _parcelaInicial
+          : 1,
+      dataCompra: DateTime.now(),
     );
 
-    if (!mounted) {
+    final novaLista = [..._compras, nova];
+    StorageService.ordenar(novaLista);
+
+    try {
+      await StorageService.salvarCompras(novaLista);
+    } catch (e) {
+      debugPrint('Erro ao salvar compra: $e');
+      if (!mounted) return;
+      mostrarAviso(context, 'Não foi possível salvar. Tente novamente.');
       return;
     }
-
-    final localTheme = Theme.of(context);
-    final isDarkLocal = localTheme.brightness == Brightness.dark;
+    if (!mounted) return;
 
     setState(() {
-      _compras.add(novaCompra);
-      _parenteController.clear();
+      _compras = novaLista;
+      _pessoaController.clear();
       _valorController.clear();
       _localController.clear();
       _parcelasSelecionadas = 1;
-      _parcelaAtualSelecionada = 1;
-      _inserirPorValorParcela = false;
-      _ehAssinaturaRecorrente = false;
+      _parcelaInicial = 1;
+      _porValorParcela = false;
+      _assinatura = false;
     });
-    await StorageService.salvarCompras(_compras);
-
-    HapticFeedback.vibrate();
-
-    messengerKey.currentState?.clearSnackBars();
-    messengerKey.currentState?.showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16.0),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: localTheme.colorScheme.primary,
-        duration: const Duration(seconds: 2),
-        content: Row(
-          children: [
-            Icon(
-              Icons.check_circle_outline_rounded,
-              color: isDarkLocal ? const Color(0xFF1D1D1F) : Colors.white,
-              size: 22,
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'Compra registrada com sucesso!',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: isDarkLocal ? const Color(0xFF1D1D1F) : Colors.white,
-                letterSpacing: -0.3,
-              ),
-            ),
-          ],
-        ),
-      ),
+    HapticFeedback.mediumImpact();
+    mostrarAviso(
+      context,
+      'Compra registrada com sucesso!',
+      icone: Icons.check_circle_outline_rounded,
     );
-  }
-
-  @override
-  void dispose() {
-    _parenteController.dispose();
-    _valorController.dispose();
-    _localController.dispose();
-    super.dispose();
   }
 
   @override
@@ -167,451 +152,314 @@ class _HomePageState extends State<HomePage> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final List<BoxShadow> profundidadeSutil = [
-      BoxShadow(
-        color: isDark
-            ? Colors.black.withValues(alpha: 0.5)
-            : Colors.black.withValues(alpha: 0.04),
-        blurRadius: 10,
-        offset: const Offset(0, 4),
+    // Sem PopScope: o Android já fecha o menu lateral no "voltar"
+    // e, com o menu fechado, o "voltar" sai do app normalmente.
+    return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: const Text('Fatora'),
+        centerTitle: true,
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        leading: IconButton(
+          icon: Icon(Icons.menu_rounded, color: theme.colorScheme.primary),
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+        ),
       ),
-      BoxShadow(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.02)
-            : Colors.white.withValues(alpha: 0.4),
-        blurRadius: 1,
-        offset: const Offset(0, -1),
+      drawer: MenuLateral(
+        compras: _compras,
+        onRemoverCompra: (id) async {
+          _compras.removeWhere((c) => c.id == id);
+          await _persistirLista();
+        },
+        onAdicionarCompra: (compra) async {
+          _compras.add(compra);
+          StorageService.ordenar(_compras);
+          await _persistirLista();
+        },
+        onCartoesAtualizados: _carregarDadosIniciais,
       ),
-    ];
+      body: SafeArea(bottom: true, child: _corpo(theme, isDark)),
+    );
+  }
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) {
-          return;
-        }
-        if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
-          Navigator.pop(context);
-        } else {
-          _scaffoldKey.currentState?.openDrawer();
-        }
-      },
-      child: Scaffold(
-        key: _scaffoldKey,
-        backgroundColor: theme.scaffoldBackgroundColor,
-        appBar: AppBar(
-          title: const Text('Fatora'),
-          centerTitle: true,
-          backgroundColor: theme.appBarTheme.backgroundColor,
-          leading: IconButton(
-            icon: Icon(Icons.menu_rounded, color: theme.colorScheme.primary),
-            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+  Future<void> _persistirLista() async {
+    try {
+      await StorageService.salvarCompras(_compras);
+    } catch (e) {
+      debugPrint('Erro ao salvar: $e');
+      if (mounted) {
+        mostrarAviso(context, 'Não foi possível salvar a alteração.');
+      }
+    }
+    if (mounted) setState(() {});
+  }
+
+  Widget _corpo(ThemeData theme, bool isDark) {
+    if (_carregando) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_erro) {
+      return _mensagemComBotao(
+        theme,
+        'Não foi possível carregar seus dados.',
+        'Tentar de novo',
+        () {
+          setState(() => _carregando = true);
+          _carregarDadosIniciais();
+        },
+      );
+    }
+    if (_nomesCartoes.isEmpty) {
+      return _mensagemComBotao(
+        theme,
+        'Nenhum cartão cadastrado.',
+        'Cadastrar cartão',
+        () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                GerenciarCartoesPage(onAtualizado: _carregarDadosIniciais),
           ),
         ),
-        drawer: MenuLateral(
-          compras: _compras,
-          onRemoverCompra: (id) async {
-            _compras.removeWhere((item) => item.id == id);
-            await StorageService.salvarCompras(_compras);
-            if (mounted) {
-              setState(() {});
-            }
-          },
-          onAdicionarCompra: (compra) async {
-            _compras.add(compra);
-            _compras.sort((a, b) => b.dataCompra.compareTo(a.dataCompra));
-            await StorageService.salvarCompras(_compras);
-            if (mounted) {
-              setState(() {});
-            }
-          },
-          onCartoesAtualizados: _carregarDadosIniciais,
+      );
+    }
+    return _formulario(theme, isDark);
+  }
+
+  Widget _mensagemComBotao(
+    ThemeData theme,
+    String mensagem,
+    String botao,
+    VoidCallback aoApertar,
+  ) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              mensagem,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextButton(onPressed: aoApertar, child: Text(botao)),
+          ],
         ),
-        body: SafeArea(
-          bottom: true,
-          child: _nomesCartoes.isEmpty
-              ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20.0,
-                    vertical: 16.0,
+      ),
+    );
+  }
+
+  Widget _campoPessoa(ThemeData theme) {
+    return LayoutBuilder(
+      builder: (context, constraints) => RawAutocomplete<String>(
+        textEditingController: _pessoaController,
+        focusNode: _pessoaFocus,
+        optionsBuilder: (TextEditingValue valor) {
+          final chave = chaveNome(valor.text);
+          if (chave.isEmpty) return const Iterable<String>.empty();
+          return StorageService.nomesPessoas(_compras).where((nome) {
+            final c = chaveNome(nome);
+            return c.contains(chave) && c != chave;
+          });
+        },
+        fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+          return CampoPadrao(
+            controller: controller,
+            focusNode: focusNode,
+            hint: 'Ex: João...',
+            capitalizacao: TextCapitalization.words,
+            validador: (v) =>
+                v == null || v.trim().isEmpty ? 'Obrigatório' : null,
+          );
+        },
+        optionsViewBuilder: (context, onSelected, options) {
+          return Align(
+            alignment: Alignment.topLeft,
+            child: Material(
+              elevation: 4,
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: 200,
+                  maxWidth: constraints.maxWidth,
+                ),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (context, i) {
+                    final nome = options.elementAt(i);
+                    return ListTile(
+                      dense: true,
+                      title: Text(nome),
+                      onTap: () => onSelected(nome),
+                    );
+                  },
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _formulario(ThemeData theme, bool isDark) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const TituloCampo('Quem usou o cartão?'),
+            const SizedBox(height: 8),
+            _campoPessoa(theme),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: TituloCampo(
+                    _porValorParcela
+                        ? 'Qual o valor da parcela?'
+                        : 'Qual o valor total da compra?',
                   ),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          'Quem usou o cartão?',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: theme.colorScheme.primary,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: profundidadeSutil,
-                          ),
-                          child: TextFormField(
-                            controller: _parenteController,
-                            textCapitalization: TextCapitalization.words,
-                            style: TextStyle(color: theme.colorScheme.primary),
-                            decoration: InputDecoration(
-                              hintText: 'Ex: João...',
-                              hintStyle: TextStyle(
-                                color: theme.colorScheme.secondary.withValues(
-                                  alpha: 0.6,
-                                ),
-                              ),
-                              filled: true,
-                              fillColor: theme.colorScheme.surface,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: isDark
-                                      ? Colors.white10
-                                      : Colors.black12,
-                                  width: 1,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: theme.colorScheme.primary,
-                                  width: 1.5,
-                                ),
-                              ),
-                            ),
-                            validator: (val) =>
-                                val == null || val.trim().isEmpty
-                                ? 'Obrigatório'
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _inserirPorValorParcela
-                                    ? 'Qual o valor da parcela?'
-                                    : 'Qual o valor total da compra?',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: theme.colorScheme.primary,
-                                  letterSpacing: -0.3,
-                                ),
-                              ),
-                            ),
-                            if (!_ehAssinaturaRecorrente)
-                              GestureDetector(
-                                onTapDown: (_) =>
-                                    setState(() => _escalaSwitchParcela = 0.92),
-                                onTapUp: (_) =>
-                                    setState(() => _escalaSwitchParcela = 1.0),
-                                onTapCancel: () =>
-                                    setState(() => _escalaSwitchParcela = 1.0),
-                                child: AnimatedScale(
-                                  scale: _escalaSwitchParcela,
-                                  duration: const Duration(milliseconds: 100),
-                                  child: Switch(
-                                    activeThumbColor: isDark
-                                        ? const Color(0xFF000000)
-                                        : Colors.white,
-                                    activeTrackColor: isDark
-                                        ? Colors.white
-                                        : const Color(0xFF1D1D1F),
-                                    inactiveThumbColor: isDark
-                                        ? Colors.grey.shade600
-                                        : Colors.grey.shade400,
-                                    inactiveTrackColor: isDark
-                                        ? Colors.white10
-                                        : Colors.black12,
-                                    value: _inserirPorValorParcela,
-                                    onChanged: (val) {
-                                      HapticFeedback.lightImpact();
-                                      setState(
-                                        () => _inserirPorValorParcela = val,
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: profundidadeSutil,
-                          ),
-                          child: TextFormField(
-                            controller: _valorController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            style: TextStyle(color: theme.colorScheme.primary),
-                            decoration: InputDecoration(
-                              hintText: '0,00',
-                              prefixText: 'R\$ ',
-                              prefixStyle: TextStyle(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              hintStyle: TextStyle(
-                                color: theme.colorScheme.secondary.withValues(
-                                  alpha: 0.6,
-                                ),
-                              ),
-                              filled: true,
-                              fillColor: theme.colorScheme.surface,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: isDark
-                                      ? Colors.white10
-                                      : Colors.black12,
-                                  width: 1,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: theme.colorScheme.primary,
-                                  width: 1.5,
-                                ),
-                              ),
-                            ),
-                            validator: (val) =>
-                                val == null || val.trim().isEmpty
-                                ? 'Obrigatório'
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Onde ou o que foi comprado?',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: theme.colorScheme.primary,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: profundidadeSutil,
-                          ),
-                          child: TextFormField(
-                            controller: _localController,
-                            textCapitalization: TextCapitalization.words,
-                            style: TextStyle(color: theme.colorScheme.primary),
-                            decoration: InputDecoration(
-                              hintText:
-                                  'Ex: Mercado, Farmácia, Tênis, Dentista...',
-                              hintStyle: TextStyle(
-                                color: theme.colorScheme.secondary.withValues(
-                                  alpha: 0.6,
-                                ),
-                              ),
-                              filled: true,
-                              fillColor: theme.colorScheme.surface,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: isDark
-                                      ? Colors.white10
-                                      : Colors.black12,
-                                  width: 1,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: theme.colorScheme.primary,
-                                  width: 1.5,
-                                ),
-                              ),
-                            ),
-                            validator: (val) =>
-                                val == null || val.trim().isEmpty
-                                ? 'Obrigatório'
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(height: 28),
-                        SeletorCartao(
-                          cartaoSelecionado: _cartaoSelecionado,
-                          listaCartoes: _nomesCartoes,
-                          onSelected: (n) =>
-                              setState(() => _cartaoSelecionado = n),
-                        ),
-                        const SizedBox(height: 24),
-                        Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: profundidadeSutil,
-                          ),
-                          child: Card(
-                            margin: EdgeInsets.zero,
-                            elevation: 0,
-                            color: theme.colorScheme.surface,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              side: BorderSide(
-                                color: isDark ? Colors.white10 : Colors.black12,
-                                width: 1,
-                              ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      'É uma assinatura mensal?',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: theme.colorScheme.primary,
-                                        letterSpacing: -0.3,
-                                      ),
-                                    ),
-                                  ),
-                                  GestureDetector(
-                                    onTapDown: (_) => setState(
-                                      () => _escalaSwitchAssinatura = 0.92,
-                                    ),
-                                    onTapUp: (_) => setState(
-                                      () => _escalaSwitchAssinatura = 1.0,
-                                    ),
-                                    onTapCancel: () => setState(
-                                      () => _escalaSwitchAssinatura = 1.0,
-                                    ),
-                                    child: AnimatedScale(
-                                      scale: _escalaSwitchAssinatura,
-                                      duration: const Duration(
-                                        milliseconds: 100,
-                                      ),
-                                      child: Switch(
-                                        activeThumbColor: isDark
-                                            ? const Color(0xFF000000)
-                                            : Colors.white,
-                                        activeTrackColor: isDark
-                                            ? Colors.white
-                                            : const Color(0xFF1D1D1F),
-                                        inactiveThumbColor: isDark
-                                            ? Colors.grey.shade600
-                                            : Colors.grey.shade400,
-                                        inactiveTrackColor: isDark
-                                            ? Colors.white10
-                                            : Colors.black12,
-                                        value: _ehAssinaturaRecorrente,
-                                        onChanged: (val) {
-                                          HapticFeedback.lightImpact();
-                                          setState(() {
-                                            _ehAssinaturaRecorrente = val;
-                                            if (val) {
-                                              _inserirPorValorParcela = false;
-                                            }
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (!_ehAssinaturaRecorrente) ...[
-                          const SizedBox(height: 20),
-                          SeletorParcelas(
-                            parcelas: _parcelasSelecionadas,
-                            onChanged: (n) =>
-                                setState(() => _parcelasSelecionadas = n),
-                          ),
-                          SeletorParcelaAtual(
-                            parcelaAtual: _parcelaAtualSelecionada,
-                            totalParcelas: _parcelasSelecionadas,
-                            onChanged: (n) =>
-                                setState(() => _parcelaAtualSelecionada = n),
-                          ),
-                        ],
-                        const SizedBox(height: 36),
-                        Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: [
-                              BoxShadow(
-                                color: isDark
-                                    ? const Color(
-                                        0xFF3A3A3C,
-                                      ).withValues(alpha: 0.4)
-                                    : Colors.black.withValues(alpha: 0.12),
-                                blurRadius: 16,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: ElevatedButton(
-                            onPressed: _salvarCompra,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isDark
-                                  ? const Color(0xFF3A3A3C)
-                                  : theme.colorScheme.primary,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                                side: BorderSide(
-                                  color: isDark
-                                      ? Colors.white10
-                                      : Colors.transparent,
-                                  width: 1,
-                                ),
-                              ),
-                            ),
-                            child: const Text(
-                              'Salvar Registro',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                ),
+                if (!_assinatura)
+                  SwitchPadrao(
+                    valor: _porValorParcela,
+                    onChanged: (v) => setState(() {
+                      _porValorParcela = v;
+                      if (!v) {
+                        _parcelasSelecionadas = 1;
+                        _parcelaInicial = 1;
+                      }
+                    }),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            CampoPadrao(
+              controller: _valorController,
+              hint: '0,00',
+              prefixo: 'R\$ ',
+              teclado: TextInputType.number,
+              formatadores: [MoedaInputFormatter()],
+              validador: (v) {
+                final c = lerCentavos(v ?? '');
+                return (c == null || c <= 0) ? 'Informe um valor' : null;
+              },
+            ),
+            const SizedBox(height: 24),
+            const TituloCampo('Onde ou o que foi comprado?'),
+            const SizedBox(height: 8),
+            CampoPadrao(
+              controller: _localController,
+              hint: 'Ex: Mercado, Farmácia, Tênis, Dentista...',
+              capitalizacao: TextCapitalization.words,
+              validador: (v) =>
+                  v == null || v.trim().isEmpty ? 'Obrigatório' : null,
+            ),
+            const SizedBox(height: 28),
+            SeletorCartao(
+              cartaoSelecionado: _cartaoSelecionado,
+              listaCartoes: _nomesCartoes,
+              onSelected: (n) => setState(() => _cartaoSelecionado = n),
+            ),
+            const SizedBox(height: 24),
+            CartaoPadrao(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Expanded(
+                    child: TituloCampo('É uma assinatura mensal?'),
+                  ),
+                  SwitchPadrao(
+                    valor: _assinatura,
+                    onChanged: (v) => setState(() {
+                      _assinatura = v;
+                      if (v) {
+                        _porValorParcela = false;
+                        _parcelasSelecionadas = 1;
+                        _parcelaInicial = 1;
+                      }
+                    }),
+                  ),
+                ],
+              ),
+            ),
+            if (!_assinatura && _porValorParcela) ...[
+              const SizedBox(height: 20),
+              SeletorParcelas(
+                parcelas: _parcelasSelecionadas,
+                onChanged: (n) {
+                  // Limita o total e mantém "começar da parcela" válido.
+                  final novo = min(max(n, 1), _maxParcelas);
+                  setState(() {
+                    _parcelasSelecionadas = novo;
+                    if (_parcelaInicial > novo) _parcelaInicial = novo;
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              SeletorParcelaAtual(
+                parcelaAtual: _parcelaInicial,
+                totalParcelas: _parcelasSelecionadas,
+                onChanged: (n) => setState(() => _parcelaInicial = n),
+              ),
+            ],
+            const SizedBox(height: 36),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: isDark
+                        ? const Color(0xFF3A3A3C).withValues(alpha: 0.4)
+                        : Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ElevatedButton(
+                onPressed: _salvarCompra,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDark
+                      ? const Color(0xFF3A3A3C)
+                      : theme.colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: BorderSide(
+                      color: isDark ? Colors.white10 : Colors.transparent,
+                      width: 1,
                     ),
                   ),
                 ),
+                child: const Text(
+                  'Salvar Registro',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
         ),
       ),
     );

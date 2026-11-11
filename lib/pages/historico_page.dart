@@ -4,6 +4,8 @@ import 'package:fatora/main.dart';
 import '../models/compra_model.dart';
 import '../components/menu_lateral.dart';
 import 'home_page.dart';
+import '../services/storage_service.dart';
+import '../utils/formatadores.dart';
 
 class HistoricoPage extends StatefulWidget {
   final List<CompraModel> compras;
@@ -32,6 +34,32 @@ class _HistoricoPageState extends State<HistoricoPage> {
   final TextEditingController _buscaController = TextEditingController();
   String _textoBusca = '';
 
+  // Dia de corte (melhor dia de compra) de cada cartão, pela chave do nome.
+  Map<String, int> _cortes = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarCortes();
+  }
+
+  Future<void> _carregarCortes() async {
+    try {
+      final cartoes = await StorageService.obterConfiguracaoCartoes();
+      if (!mounted) return;
+      setState(() {
+        _cortes = {
+          for (final c in cartoes)
+            chaveNome(c['nome'] as String): c['fechamento'] as int,
+        };
+      });
+    } catch (e) {
+      debugPrint('Erro ao carregar cartões no histórico: $e');
+    }
+  }
+
+  int _corteDoCartao(String nome) => _cortes[chaveNome(nome)] ?? 10;
+
   @override
   void dispose() {
     _buscaController.dispose();
@@ -43,11 +71,12 @@ class _HistoricoPageState extends State<HistoricoPage> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    // Busca sem diferenciar maiúscula nem acento.
+    final termo = chaveNome(_textoBusca);
     final comprasFiltradas = widget.compras.where((item) {
-      final termo = _textoBusca.toLowerCase();
-      final porParente = item.parente.toLowerCase().contains(termo);
-      final porLocal = item.local.toLowerCase().contains(termo);
-      final porCartao = item.cartao.toLowerCase().contains(termo);
+      final porParente = chaveNome(item.parente).contains(termo);
+      final porLocal = chaveNome(item.local).contains(termo);
+      final porCartao = chaveNome(item.cartao).contains(termo);
       return porParente || porLocal || porCartao;
     }).toList();
 
@@ -221,9 +250,6 @@ class _HistoricoPageState extends State<HistoricoPage> {
                             ),
                             onDismissed: (direction) {
                               final compraRemovida = item;
-                              final indexOriginal = widget.compras.indexOf(
-                                item,
-                              );
                               setState(() {
                                 widget.onRemover(item.id);
                               });
@@ -236,7 +262,7 @@ class _HistoricoPageState extends State<HistoricoPage> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   backgroundColor: theme.colorScheme.primary,
-                                  duration: const Duration(seconds: 2),
+                                  duration: const Duration(seconds: 4),
                                   content: Text(
                                     'Compra de ${compraRemovida.parente} removida',
                                     style: TextStyle(
@@ -252,16 +278,10 @@ class _HistoricoPageState extends State<HistoricoPage> {
                                         ? Colors.blue.shade400
                                         : Colors.blue.shade300,
                                     onPressed: () {
+                                      // O onAdicionar já adiciona, ordena e
+                                      // salva. Não mexa na lista aqui.
                                       setState(() {
                                         widget.onAdicionar(compraRemovida);
-                                        if (indexOriginal <
-                                            widget.compras.length) {
-                                          widget.compras.removeLast();
-                                          widget.compras.insert(
-                                            indexOriginal,
-                                            compraRemovida,
-                                          );
-                                        }
                                       });
                                       messengerKey.currentState
                                           ?.clearSnackBars();
@@ -314,9 +334,7 @@ class _HistoricoPageState extends State<HistoricoPage> {
                                 subtitle: Padding(
                                   padding: const EdgeInsets.only(top: 4.0),
                                   child: Text(
-                                    item.ehAssinatura
-                                        ? '${item.local} • Assinatura'
-                                        : '${item.local} • Parcela ${item.parcelaAtual} de ${item.totalParcelas}',
+                                    '${item.local} • ${item.rotuloParcelaNoMes(DateTime.now(), _corteDoCartao(item.cartao))}',
                                     style: TextStyle(
                                       color: theme.colorScheme.secondary
                                           .withValues(alpha: 0.7),

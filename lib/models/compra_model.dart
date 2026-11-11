@@ -1,99 +1,128 @@
+import 'dart:math';
+
 class CompraModel {
+  /// Valor usado em totalParcelas para marcar assinatura mensal.
+  static const int tipoAssinatura = 999;
+
   final String id;
   final String parente;
-  final double valorTotal;
+
+  /// Dinheiro sempre em centavos (int), para não ter erro de ponto flutuante.
+  final int valorTotalCentavos;
   final String local;
   final String cartao;
   final int totalParcelas;
+
+  /// Em qual parcela a compra estava quando foi registrada (padrão 1).
+  /// Substitui o antigo "truque" de voltar a dataCompra alguns meses.
+  final int parcelaInicial;
   final DateTime dataCompra;
 
-  CompraModel({
+  const CompraModel({
     required this.id,
     required this.parente,
-    required this.valorTotal,
+    required this.valorTotalCentavos,
     required this.local,
     required this.cartao,
     required this.totalParcelas,
     required this.dataCompra,
+    this.parcelaInicial = 1,
   });
 
-  bool get ehAssinatura => totalParcelas == 999;
+  double get valorTotal => valorTotalCentavos / 100;
 
-  DateTime _obterDataFaturamentoInicial(
-    DateTime data,
-    int diaFechamentoOuVencimento,
-  ) {
-    int anoAtual = data.year;
-    int mesAtual = data.month;
-    int diaFechamentoReal = diaFechamentoOuVencimento;
+  bool get ehAssinatura => totalParcelas == tipoAssinatura;
 
-    if (diaFechamentoOuVencimento > 10) {
-      diaFechamentoReal = diaFechamentoOuVencimento - 10;
+  int get valorParcelaCentavos => ehAssinatura
+      ? valorTotalCentavos
+      : (valorTotalCentavos / totalParcelas).round();
+
+  double get valorParcela => valorParcelaCentavos / 100;
+
+  /// Quantos dias o mês tem (28, 29, 30 ou 31). Considera ano bissexto.
+  static int diasNoMes(int ano, int mes) => DateTime(ano, mes + 1, 0).day;
+
+  /// Mês (dia 1) da primeira fatura em que a compra aparece.
+  ///
+  /// [diaCorte] é o "melhor dia de compra": a partir desse dia, a compra
+  /// já cai na fatura seguinte. Se o mês não tem esse dia (ex.: dia 31 em
+  /// fevereiro ou abril), vale o último dia do mês.
+  DateTime mesPrimeiraFatura(int diaCorte) {
+    final corte = min(diaCorte, diasNoMes(dataCompra.year, dataCompra.month));
+    if (dataCompra.day >= corte) {
+      return DateTime(dataCompra.year, dataCompra.month + 1);
     }
-
-    DateTime limiteFaturaMesAtual = DateTime(
-      anoAtual,
-      mesAtual,
-      diaFechamentoReal,
-    );
-
-    if (data.isAfter(limiteFaturaMesAtual) ||
-        data.isAtSameMomentAs(limiteFaturaMesAtual)) {
-      int proximoMes = mesAtual + 1;
-      int anoDoProximoMes = anoAtual;
-      if (proximoMes > 12) {
-        proximoMes = 1;
-        anoDoProximoMes += 1;
-      }
-      return DateTime(anoDoProximoMes, proximoMes, 1);
-    } else {
-      return DateTime(anoAtual, mesAtual, 1);
-    }
+    return DateTime(dataCompra.year, dataCompra.month);
   }
 
-  int calcularParcelaNoMes(DateTime mesAlvo, int diaFechamentoOuVencimento) {
-    if (ehAssinatura) {
-      return 1;
-    }
-
-    DateTime dataInicioFaturamento = _obterDataFaturamentoInicial(
-      dataCompra,
-      diaFechamentoOuVencimento,
-    );
-    DateTime dataAlvoFiltro = DateTime(mesAlvo.year, mesAlvo.month, 1);
-
+  /// Número da parcela que cai no mês [mesAlvo] (pode ser < 1 ou > total).
+  int calcularParcelaNoMes(DateTime mesAlvo, int diaCorte) {
+    if (ehAssinatura) return 1;
+    final inicio = mesPrimeiraFatura(diaCorte);
+    final alvo = DateTime(mesAlvo.year, mesAlvo.month);
     final diferencaMeses =
-        (dataAlvoFiltro.year - dataInicioFaturamento.year) * 12 +
-        (dataAlvoFiltro.month - dataInicioFaturamento.month);
-
-    return diferencaMeses + 1;
+        (alvo.year - inicio.year) * 12 + (alvo.month - inicio.month);
+    return diferencaMeses + parcelaInicial;
   }
 
-  bool estaAtivaNoMes(DateTime mesAlvo, int diaFechamentoOuVencimento) {
+  bool estaAtivaNoMes(DateTime mesAlvo, int diaCorte) {
     if (ehAssinatura) {
-      DateTime dataInicioFaturamento = _obterDataFaturamentoInicial(
-        dataCompra,
-        diaFechamentoOuVencimento,
-      );
-      final DateTime dataFiltroAlvo = DateTime(mesAlvo.year, mesAlvo.month, 1);
-
-      return dataFiltroAlvo.isAfter(dataInicioFaturamento) ||
-          (dataFiltroAlvo.year == dataInicioFaturamento.year &&
-              dataFiltroAlvo.month == dataInicioFaturamento.month);
+      final inicio = mesPrimeiraFatura(diaCorte);
+      final alvo = DateTime(mesAlvo.year, mesAlvo.month);
+      return !alvo.isBefore(inicio);
     }
-
-    final parcela = calcularParcelaNoMes(mesAlvo, diaFechamentoOuVencimento);
+    final parcela = calcularParcelaNoMes(mesAlvo, diaCorte);
     return parcela >= 1 && parcela <= totalParcelas;
   }
 
-  int get parcelaAtual {
-    return calcularParcelaNoMes(DateTime.now(), 15);
+  /// Texto para listas: "Parcela 3 de 10", "Quitada", "À vista"...
+  String rotuloParcelaNoMes(DateTime mes, int diaCorte) {
+    if (ehAssinatura) return 'Assinatura';
+    if (totalParcelas == 1) return 'À vista';
+    final p = calcularParcelaNoMes(mes, diaCorte);
+    if (p > totalParcelas) return 'Quitada';
+    if (p < 1) return 'Ainda não começou';
+    return 'Parcela $p de $totalParcelas';
   }
 
-  bool get estaAtiva {
-    return estaAtivaNoMes(DateTime.now(), 15);
+  CompraModel copyWith({String? parente, String? cartao}) {
+    return CompraModel(
+      id: id,
+      parente: parente ?? this.parente,
+      valorTotalCentavos: valorTotalCentavos,
+      local: local,
+      cartao: cartao ?? this.cartao,
+      totalParcelas: totalParcelas,
+      dataCompra: dataCompra,
+      parcelaInicial: parcelaInicial,
+    );
   }
 
-  double get valorParcela =>
-      ehAssinatura ? valorTotal : (valorTotal / totalParcelas);
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'parente': parente,
+    'valorTotalCentavos': valorTotalCentavos,
+    'local': local,
+    'cartao': cartao,
+    'totalParcelas': totalParcelas,
+    'parcelaInicial': parcelaInicial,
+    'dataCompra': dataCompra.toIso8601String(),
+  };
+
+  /// Lê tanto o formato novo quanto o antigo (valorTotal em reais).
+  factory CompraModel.fromJson(Map<String, dynamic> json) {
+    final centavos =
+        (json['valorTotalCentavos'] as num?)?.toInt() ??
+        ((json['valorTotal'] as num).toDouble() * 100).round();
+    return CompraModel(
+      id: json['id'] as String,
+      parente: json['parente'] as String,
+      valorTotalCentavos: centavos,
+      local: json['local'] as String,
+      cartao: json['cartao'] as String,
+      totalParcelas: (json['totalParcelas'] as num).toInt(),
+      parcelaInicial: (json['parcelaInicial'] as num?)?.toInt() ?? 1,
+      dataCompra: DateTime.parse(json['dataCompra'] as String),
+    );
+  }
 }
